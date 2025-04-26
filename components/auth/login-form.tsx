@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -10,19 +10,26 @@ import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
-import { login } from "@/lib/auth"
+import { useAuth } from "@/lib/auth"
 
 const formSchema = z.object({
   username: z.string().min(1, { message: "Username is required" }),
   password: z.string().min(1, { message: "Password is required" }),
 })
 
+type FormValues = z.infer<typeof formSchema>
+
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
+  const { login } = useAuth()
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  // Get redirect path from URL if available
+  const redirectPath = searchParams.get("redirect") || "/"
+
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       username: "",
@@ -30,7 +37,7 @@ export function LoginForm() {
     },
   })
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: FormValues) {
     setIsLoading(true)
 
     try {
@@ -41,7 +48,7 @@ export function LoginForm() {
           title: "Login successful",
           description: "You have been logged in successfully.",
         })
-        router.push("/")
+        router.push(redirectPath)
         router.refresh()
       } else {
         toast({

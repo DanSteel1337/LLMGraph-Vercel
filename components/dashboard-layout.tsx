@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { BarChart3, FileUp, FolderOpen, Search, MessageSquare, Menu, LogOut, User } from "lucide-react"
@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
-import { logout, getCurrentUser, isAuthenticated } from "@/lib/auth"
+import { useAuth } from "@/lib/auth"
 import { useToast } from "@/components/ui/use-toast"
 
 interface NavItem {
@@ -50,34 +50,35 @@ const navItems: NavItem[] = [
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
-  const [username, setUsername] = useState<string | null>(null)
-  const [mounted, setMounted] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+  const { user, logout, loading } = useAuth()
 
-  useEffect(() => {
-    setMounted(true)
+  // Don't render the dashboard layout on the login page
+  if (pathname === "/login") {
+    return <>{children}</>
+  }
 
-    // Check authentication on client side
-    if (!isAuthenticated()) {
-      router.push("/login")
-    } else {
-      setUsername(getCurrentUser())
-    }
-  }, [router])
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     toast({
       title: "Logged out",
       description: "You have been logged out successfully.",
     })
     router.push("/login")
-  }
-
-  // Don't render anything until client-side hydration is complete
-  if (!mounted) {
-    return null
+    router.refresh()
   }
 
   return (
@@ -119,7 +120,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4" />
-                    <span className="text-sm font-medium">{username}</span>
+                    <span className="text-sm font-medium">{user?.name}</span>
                   </div>
                 </div>
                 <Button variant="outline" className="w-full justify-start gap-2" onClick={handleLogout}>
@@ -137,7 +138,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <div className="hidden md:flex items-center gap-2">
             <div className="flex items-center gap-2">
               <User className="h-4 w-4" />
-              <span className="text-sm font-medium">{username}</span>
+              <span className="text-sm font-medium">{user?.name}</span>
             </div>
             <Button variant="outline" size="sm" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
@@ -178,7 +179,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  <span className="text-sm font-medium">{username}</span>
+                  <span className="text-sm font-medium">{user?.name}</span>
                 </div>
               </div>
               <Button variant="outline" className="w-full justify-start gap-2" onClick={handleLogout}>

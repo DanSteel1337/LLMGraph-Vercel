@@ -1,0 +1,69 @@
+"use client"
+
+import type React from "react"
+
+import { useEffect, useState } from "react"
+import { AlertCircle, RefreshCw } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+
+interface ErrorBoundaryProps {
+  children: React.ReactNode
+  fallback?: React.ReactNode
+}
+
+export function ErrorBoundary({ children, fallback }: ErrorBoundaryProps) {
+  const [hasError, setHasError] = useState(false)
+
+  useEffect(() => {
+    // Add event listener for chunk load errors
+    const handleChunkError = (event: ErrorEvent) => {
+      const isChunkLoadError =
+        event.message.includes("Loading chunk") ||
+        event.message.includes("ChunkLoadError") ||
+        /Loading (CSS|chunk) \d+ failed/.test(event.message)
+
+      if (isChunkLoadError) {
+        console.error("Chunk loading error detected:", event)
+        setHasError(true)
+        // Prevent the error from bubbling up
+        event.preventDefault()
+      }
+    }
+
+    window.addEventListener("error", handleChunkError)
+
+    return () => {
+      window.removeEventListener("error", handleChunkError)
+    }
+  }, [])
+
+  if (hasError) {
+    return (
+      fallback || (
+        <Alert variant="destructive" className="my-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error loading content</AlertTitle>
+          <AlertDescription className="flex flex-col gap-2">
+            <p>
+              There was a problem loading this content. This might be due to a network issue or a problem with the
+              application.
+            </p>
+            <div className="flex gap-2 mt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.reload()}
+                className="flex items-center gap-1"
+              >
+                <RefreshCw className="h-3 w-3" /> Refresh page
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )
+    )
+  }
+
+  return <>{children}</>
+}

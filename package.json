@@ -59,8 +59,8 @@
     "vaul": "^0.9.6",
     "zod": "latest",
     "@tanstack/react-table": "latest",
-    "react-markdown": "latest",
-    "jwt-decode": "latest"
+    "jose": "latest",
+    "react-markdown": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

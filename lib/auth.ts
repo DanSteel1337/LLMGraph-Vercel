@@ -1,116 +1,117 @@
 "use client"
 
-import { jwtDecode } from "jwt-decode"
+import type React from "react"
 
-// In a real application, you would use a proper authentication service
-// This is a simple implementation for demonstration purposes
+import { useState, useEffect, createContext, useContext } from "react"
 
-// Demo credentials - in a real app, these would be stored securely in a database
-const DEMO_USERNAME = "admin"
-const DEMO_PASSWORD = "password123"
-
-// JWT token structure
-interface JwtPayload {
+// Define user type
+export interface User {
+  id: string
   username: string
-  exp: number
+  name: string
+  role: string
 }
 
-// Check if running in browser
-const isBrowser = typeof window !== "undefined"
+// Define auth context type
+interface AuthContextType {
+  user: User | null
+  loading: boolean
+  login: (username: string, password: string) => Promise<boolean>
+  logout: () => Promise<void>
+}
 
-// Login function
-export async function login(username: string, password: string): Promise<boolean> {
-  // Simulate API call delay
-  await new Promise((resolve) => setTimeout(resolve, 1000))
+// Create auth context
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-  // Check credentials
-  if (username === DEMO_USERNAME && password === DEMO_PASSWORD) {
-    // Create a simple JWT token (in a real app, this would be done on the server)
-    const token = createToken(username)
+// Auth provider component
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
-    // Store token in localStorage
-    if (isBrowser) {
-      localStorage.setItem("auth_token", token)
+  // Check if user is logged in on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("/api/auth/me")
+        const data = await response.json()
+
+        if (response.ok && data.user) {
+          setUser(data.user)
+        } else {
+          setUser(null)
+        }
+      } catch (error) {
+        console.error("Auth check error:", error)
+        setUser(null)
+      } finally {
+        setLoading(false)
+      }
     }
 
-    return true
-  }
+    checkAuth()
+  }, [])
 
-  return false
-}
+  // Login function
+  const login = async (username: string, password: string): Promise<boolean> => {
+    try {
+      setLoading(true)
 
-// Logout function
-export function logout(): void {
-  if (isBrowser) {
-    localStorage.removeItem("auth_token")
-  }
-}
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      })
 
-// Check if user is authenticated
-export function isAuthenticated(): boolean {
-  if (!isBrowser) {
-    return false
-  }
+      const data = await response.json()
 
-  const token = localStorage.getItem("auth_token")
+      if (response.ok && data.user) {
+        setUser(data.user)
+        return true
+      }
 
-  if (!token) {
-    return false
-  }
-
-  try {
-    const decoded = jwtDecode<JwtPayload>(token)
-
-    // Check if token is expired
-    if (decoded.exp < Date.now() / 1000) {
-      localStorage.removeItem("auth_token")
       return false
+    } catch (error) {
+      console.error("Login error:", error)
+      return false
+    } finally {
+      setLoading(false)
     }
-
-    return true
-  } catch (error) {
-    localStorage.removeItem("auth_token")
-    return false
   }
+
+  // Logout function
+  const logout = async (): Promise<void> => {
+    try {
+      setLoading(true)
+
+      await fetch("/api/auth/logout", {
+        method: "POST",
+      })
+
+      setUser(null)
+    } catch (error) {
+      console.error("Logout error:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>
 }
 
-// Get current user
-export function getCurrentUser(): string | null {
-  if (!isBrowser) {
-    return null
+// Hook to use auth context
+export function useAuth() {
+  const context = useContext(AuthContext)
+
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider")
   }
 
-  const token = localStorage.getItem("auth_token")
-
-  if (!token) {
-    return null
-  }
-
-  try {
-    const decoded = jwtDecode<JwtPayload>(token)
-    return decoded.username
-  } catch (error) {
-    return null
-  }
+  return context
 }
 
-// Create a simple JWT token (in a real app, this would be done on the server)
-function createToken(username: string): string {
-  const header = {
-    alg: "HS256",
-    typ: "JWT",
-  }
-
-  const payload = {
-    username,
-    exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24, // 24 hours
-  }
-
-  const encodedHeader = btoa(JSON.stringify(header))
-  const encodedPayload = btoa(JSON.stringify(payload))
-
-  // In a real app, you would use a proper JWT library and a secure secret
-  const signature = btoa(`${encodedHeader}.${encodedPayload}`)
-
-  return `${encodedHeader}.${encodedPayload}.${signature}`
+// Helper function to check if user is authenticated
+export function isAuthenticated(user: User | null): boolean {
+  return user !== null
 }

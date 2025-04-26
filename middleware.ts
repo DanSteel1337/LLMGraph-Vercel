@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { jwtVerify } from "jose"
 
-export function middleware(request: NextRequest) {
+// This would be an environment variable in production
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key")
+
+export async function middleware(request: NextRequest) {
   // Get the pathname of the request
   const path = request.nextUrl.pathname
 
@@ -9,7 +13,7 @@ export function middleware(request: NextRequest) {
   const isPublicPath = path === "/login"
 
   // Get the token from the cookies
-  const token = request.cookies.get("auth_token")?.value || ""
+  const token = request.cookies.get("auth_token")?.value
 
   // If the path is not public and there's no token, redirect to login
   if (!isPublicPath && !token) {
@@ -23,11 +27,35 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // If the path is login and there's a token, redirect to home
+  // If the path is not public and there's a token, verify it
+  if (!isPublicPath && token) {
+    try {
+      // Verify the token
+      await jwtVerify(token, JWT_SECRET)
+      // Token is valid, continue
+      return NextResponse.next()
+    } catch (error) {
+      // Token is invalid or expired, redirect to login
+      const url = request.nextUrl.clone()
+      url.pathname = "/login"
+      url.search = `?redirect=${path}`
+      return NextResponse.redirect(url)
+    }
+  }
+
+  // If the path is login and there's a valid token, redirect to home
   if (isPublicPath && token) {
-    const url = request.nextUrl.clone()
-    url.pathname = "/"
-    return NextResponse.redirect(url)
+    try {
+      // Verify the token
+      await jwtVerify(token, JWT_SECRET)
+      // Token is valid, redirect to home
+      const url = request.nextUrl.clone()
+      url.pathname = "/"
+      return NextResponse.redirect(url)
+    } catch (error) {
+      // Token is invalid or expired, continue to login
+      return NextResponse.next()
+    }
   }
 
   return NextResponse.next()

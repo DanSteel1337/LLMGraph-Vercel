@@ -4,10 +4,11 @@ import { Suspense } from "react"
 import dynamic from "next/dynamic"
 import { Skeleton } from "@/components/ui/skeleton"
 
-// Import the form component with dynamic import
+// Import the form component with dynamic import and explicitly disable SSR
 const DocumentUploadForm = dynamic(
   () => import("./document-upload-form").then((mod) => ({ default: mod.DocumentUploadForm })),
   {
+    ssr: false,
     loading: () => <UploadFormSkeleton />,
   },
 )

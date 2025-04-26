@@ -4,6 +4,14 @@ import { shouldUseMockData } from "./backend-connection"
 // Base API URL from environment variable
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
+// Helper function to safely handle dynamic imports
+export function safeDynamicImport<T>(importFn: () => Promise<T>, fallback: T): Promise<T> {
+  return importFn().catch((error) => {
+    console.error("Dynamic import failed:", error)
+    return fallback
+  })
+}
+
 // Helper function to log API errors consistently
 function logApiError(endpoint: string, error: any, message: string) {
   console.error(`API Error (${endpoint}): ${message}`, error instanceof Error ? error.message : error)

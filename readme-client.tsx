@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
+import { ErrorBoundary } from "@/components/error-boundary"
 
 // Dynamically import the markdown renderer with ssr: false
 const ReactMarkdown = dynamic(() => import("react-markdown"), {
   ssr: false,
+  loading: () => <div className="animate-pulse h-96 bg-muted rounded-md"></div>,
 })
 
 export function ReadmeClient({ content }: { content: string }) {
@@ -20,8 +22,12 @@ export function ReadmeClient({ content }: { content: string }) {
   }
 
   return (
-    <div className="prose prose-sm md:prose-base lg:prose-lg dark:prose-invert max-w-none">
-      <ReactMarkdown>{content}</ReactMarkdown>
-    </div>
+    <ErrorBoundary
+      fallback={<div className="prose prose-sm md:prose-base lg:prose-lg dark:prose-invert max-w-none">{content}</div>}
+    >
+      <div className="prose prose-sm md:prose-base lg:prose-lg dark:prose-invert max-w-none">
+        <ReactMarkdown>{content}</ReactMarkdown>
+      </div>
+    </ErrorBoundary>
   )
 }

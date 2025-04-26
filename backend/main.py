@@ -17,7 +17,11 @@ app = FastAPI(title="UE Documentation RAG Backend")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=[
+        "https://your-custom-domain.com",  # Replace with your actual domain
+        "https://www.your-custom-domain.com",  # Include www subdomain
+        "http://localhost:3000",  # For local development
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
