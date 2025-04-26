@@ -91,7 +91,7 @@ export function SearchResults({ results, isSearching, searchPerformed }: SearchR
               </div>
               <div className="rounded-md bg-muted p-3 text-sm">
                 {result.highlights.map((highlight, i) => (
-                  <p key={i} dangerouslySetInnerHTML={{ __html: highlight }} />
+                  <p key={i}>{highlight}</p>
                 ))}
               </div>
               <div className="flex items-center justify-end gap-2">
