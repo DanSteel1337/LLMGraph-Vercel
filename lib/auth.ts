@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, createContext, useContext } from "react"
 
 // Define user type
@@ -20,8 +19,13 @@ interface AuthContextType {
   logout: () => Promise<void>
 }
 
-// Create auth context
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+// Create auth context with default values
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: false,
+  login: async () => false,
+  logout: async () => {},
+})
 
 // Auth provider component
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -32,11 +36,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch("/api/auth/me")
-        const data = await response.json()
+        // In a real app, this would call an API
+        // For now, just check if there's a token in localStorage
+        const token = localStorage.getItem("auth_token")
 
-        if (response.ok && data.user) {
-          setUser(data.user)
+        if (token) {
+          // Mock user data
+          setUser({
+            id: "1",
+            username: "admin",
+            name: "Admin User",
+            role: "admin",
+          })
         } else {
           setUser(null)
         }
@@ -48,7 +59,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    checkAuth()
+    // Only run in the browser
+    if (typeof window !== "undefined") {
+      checkAuth()
+    } else {
+      setLoading(false)
+    }
   }, [])
 
   // Login function
@@ -56,18 +72,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true)
 
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, password }),
-      })
+      // In a real app, this would call an API
+      if (username === "admin" && password === "password123") {
+        // Set a mock token in localStorage
+        localStorage.setItem("auth_token", "mock_token")
 
-      const data = await response.json()
+        // Set user data
+        setUser({
+          id: "1",
+          username: "admin",
+          name: "Admin User",
+          role: "admin",
+        })
 
-      if (response.ok && data.user) {
-        setUser(data.user)
         return true
       }
 
@@ -85,9 +102,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true)
 
-      await fetch("/api/auth/logout", {
-        method: "POST",
-      })
+      // In a real app, this would call an API
+      localStorage.removeItem("auth_token")
 
       setUser(null)
     } catch (error) {
@@ -103,15 +119,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 // Hook to use auth context
 export function useAuth() {
   const context = useContext(AuthContext)
-
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
-  }
-
   return context
 }
 
 // Helper function to check if user is authenticated
-export function isAuthenticated(user: User | null): boolean {
-  return user !== null
+export function isAuthenticated(): boolean {
+  if (typeof window === "undefined") {
+    return false
+  }
+
+  return localStorage.getItem("auth_token") !== null
 }

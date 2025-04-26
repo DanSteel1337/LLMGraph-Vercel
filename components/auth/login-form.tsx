@@ -10,8 +10,9 @@ import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
-import { useAuth } from "@/lib/auth"
+import { ErrorBoundary } from "@/components/error-boundary"
 
+// Define the form schema
 const formSchema = z.object({
   username: z.string().min(1, { message: "Username is required" }),
   password: z.string().min(1, { message: "Password is required" }),
@@ -24,7 +25,6 @@ export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
-  const { login } = useAuth()
 
   // Get redirect path from URL if available
   const redirectPath = searchParams.get("redirect") || "/"
@@ -41,13 +41,18 @@ export function LoginForm() {
     setIsLoading(true)
 
     try {
-      const success = await login(values.username, values.password)
+      // Simple mock login for demonstration
+      // In a real app, this would call an API
+      if (values.username === "admin" && values.password === "password123") {
+        // Set a mock token in localStorage
+        localStorage.setItem("auth_token", "mock_token")
 
-      if (success) {
         toast({
           title: "Login successful",
           description: "You have been logged in successfully.",
         })
+
+        // Navigate to the redirect path
         router.push(redirectPath)
         router.refresh()
       } else {
@@ -58,6 +63,7 @@ export function LoginForm() {
         })
       }
     } catch (error) {
+      console.error("Login error:", error)
       toast({
         title: "Login failed",
         description: "An error occurred during login. Please try again.",
@@ -69,45 +75,47 @@ export function LoginForm() {
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="username"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Username</FormLabel>
-              <FormControl>
-                <Input placeholder="Enter your username" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Password</FormLabel>
-              <FormControl>
-                <Input type="password" placeholder="Enter your password" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Logging in...
-            </>
-          ) : (
-            "Login"
-          )}
-        </Button>
-      </form>
-    </Form>
+    <ErrorBoundary>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="username"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Username</FormLabel>
+                <FormControl>
+                  <Input placeholder="Enter your username" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <Input type="password" placeholder="Enter your password" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Logging in...
+              </>
+            ) : (
+              "Login"
+            )}
+          </Button>
+        </form>
+      </Form>
+    </ErrorBoundary>
   )
 }

@@ -124,89 +124,87 @@ export function DocumentPreview({ file, className }: DocumentPreviewProps) {
   }
 
   return (
-    <ErrorBoundary>
-      <Card className={cn("w-full", className)}>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center">
-            {previewType === "text" && <FileText className="h-4 w-4 mr-2" />}
-            {previewType === "html" && <FileCode className="h-4 w-4 mr-2" />}
-            {previewType === "markdown" && <FileCode className="h-4 w-4 mr-2" />}
-            {previewType === "image" && <FileImage className="h-4 w-4 mr-2" />}
-            {previewType === "pdf" && <FileText className="h-4 w-4 mr-2" />}
-            {previewType === "other" && <FileText className="h-4 w-4 mr-2" />}
-            Document Preview
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {previewType === "pdf" && preview && (
-            <div className="h-[400px] w-full overflow-hidden rounded border">
-              <iframe
-                src={preview}
-                className="h-full w-full"
-                title="PDF Preview"
-                sandbox="allow-scripts"
-                loading="lazy"
-              />
-            </div>
-          )}
+    <Card className={cn("w-full", className)}>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center">
+          {previewType === "text" && <FileText className="h-4 w-4 mr-2" />}
+          {previewType === "html" && <FileCode className="h-4 w-4 mr-2" />}
+          {previewType === "markdown" && <FileCode className="h-4 w-4 mr-2" />}
+          {previewType === "image" && <FileImage className="h-4 w-4 mr-2" />}
+          {previewType === "pdf" && <FileText className="h-4 w-4 mr-2" />}
+          {previewType === "other" && <FileText className="h-4 w-4 mr-2" />}
+          Document Preview
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {previewType === "pdf" && preview && (
+          <div className="h-[400px] w-full overflow-hidden rounded border">
+            <iframe
+              src={preview}
+              className="h-full w-full"
+              title="PDF Preview"
+              sandbox="allow-scripts"
+              loading="lazy"
+            />
+          </div>
+        )}
 
-          {previewType === "image" && preview && (
-            <div className="flex items-center justify-center p-4 h-[400px] overflow-auto">
-              <img
-                src={preview || "/placeholder.svg"}
-                alt="Document Preview"
-                className="max-w-full max-h-full object-contain"
-                loading="lazy"
-              />
-            </div>
-          )}
+        {previewType === "image" && preview && (
+          <div className="flex items-center justify-center p-4 h-[400px] overflow-auto">
+            <img
+              src={preview || "/placeholder.svg"}
+              alt="Document Preview"
+              className="max-w-full max-h-full object-contain"
+              loading="lazy"
+            />
+          </div>
+        )}
 
-          {previewType === "markdown" && preview && (
-            <div className="h-[400px] overflow-auto border rounded p-4 prose prose-sm dark:prose-invert max-w-none">
-              <ErrorBoundary fallback={<pre className="text-xs p-4 bg-muted rounded font-mono">{preview}</pre>}>
-                <ReactMarkdown>{preview}</ReactMarkdown>
+        {previewType === "markdown" && preview && (
+          <div className="h-[400px] overflow-auto border rounded p-4 prose prose-sm dark:prose-invert max-w-none">
+            <ErrorBoundary>
+              <ReactMarkdown>{preview}</ReactMarkdown>
+            </ErrorBoundary>
+          </div>
+        )}
+
+        {previewType === "html" && preview && (
+          <Tabs defaultValue="rendered" className="w-full">
+            <TabsList className="mb-2">
+              <TabsTrigger value="rendered">Rendered</TabsTrigger>
+              <TabsTrigger value="source">Source</TabsTrigger>
+            </TabsList>
+            <TabsContent value="rendered" className="h-[400px] overflow-auto border rounded">
+              <ErrorBoundary>
+                <div
+                  className="p-4 prose prose-sm dark:prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: preview }}
+                />
               </ErrorBoundary>
-            </div>
-          )}
+            </TabsContent>
+            <TabsContent value="source" className="h-[400px] overflow-auto">
+              <pre className="text-xs p-4 bg-muted rounded font-mono">{preview}</pre>
+            </TabsContent>
+          </Tabs>
+        )}
 
-          {previewType === "html" && preview && (
-            <Tabs defaultValue="rendered" className="w-full">
-              <TabsList className="mb-2">
-                <TabsTrigger value="rendered">Rendered</TabsTrigger>
-                <TabsTrigger value="source">Source</TabsTrigger>
-              </TabsList>
-              <TabsContent value="rendered" className="h-[400px] overflow-auto border rounded">
-                <ErrorBoundary fallback={<pre className="text-xs p-4 bg-muted rounded font-mono">{preview}</pre>}>
-                  <div
-                    className="p-4 prose prose-sm dark:prose-invert max-w-none"
-                    dangerouslySetInnerHTML={{ __html: preview }}
-                  />
-                </ErrorBoundary>
-              </TabsContent>
-              <TabsContent value="source" className="h-[400px] overflow-auto">
-                <pre className="text-xs p-4 bg-muted rounded font-mono">{preview}</pre>
-              </TabsContent>
-            </Tabs>
-          )}
+        {previewType === "text" && preview && (
+          <div className="h-[400px] overflow-auto border rounded">
+            <pre className="p-4 text-sm whitespace-pre-wrap font-mono">{preview}</pre>
+          </div>
+        )}
 
-          {previewType === "text" && preview && (
-            <div className="h-[400px] overflow-auto border rounded">
-              <pre className="p-4 text-sm whitespace-pre-wrap font-mono">{preview}</pre>
+        {previewType === "other" && (
+          <div className="h-[400px] flex items-center justify-center border rounded">
+            <div className="text-center p-4">
+              <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Preview is not available for this file type. You can still upload it if it meets the requirements.
+              </p>
             </div>
-          )}
-
-          {previewType === "other" && (
-            <div className="h-[400px] flex items-center justify-center border rounded">
-              <div className="text-center p-4">
-                <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  Preview is not available for this file type. You can still upload it if it meets the requirements.
-                </p>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </ErrorBoundary>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

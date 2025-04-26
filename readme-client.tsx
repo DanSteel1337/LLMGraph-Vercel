@@ -22,9 +22,7 @@ export function ReadmeClient({ content }: { content: string }) {
   }
 
   return (
-    <ErrorBoundary
-      fallback={<div className="prose prose-sm md:prose-base lg:prose-lg dark:prose-invert max-w-none">{content}</div>}
-    >
+    <ErrorBoundary>
       <div className="prose prose-sm md:prose-base lg:prose-lg dark:prose-invert max-w-none">
         <ReactMarkdown>{content}</ReactMarkdown>
       </div>
