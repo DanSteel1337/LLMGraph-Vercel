@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -18,14 +18,14 @@ const formSchema = z.object({
   password: z.string().min(1, { message: "Password is required" }),
 })
 
-export function LoginForm() {
+interface LoginFormProps {
+  redirectPath?: string
+}
+
+export function LoginForm({ redirectPath = "/" }: LoginFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { toast } = useToast()
-
-  // Get redirect path from URL if available
-  const redirectPath = searchParams?.get("redirect") || "/"
 
   // Initialize the form
   const form = useForm<z.infer<typeof formSchema>>({
