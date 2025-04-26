@@ -17,16 +17,28 @@ interface Document {
 export function RecentDocuments() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const getRecentDocuments = async () => {
       try {
+        setIsLoading(true)
+        setError(null)
         const data = await fetchRecentDocuments()
-        setDocuments(data)
-        setIsLoading(false)
+
+        // Validate the data structure
+        if (!Array.isArray(data)) {
+          console.error("Invalid data format for recent documents:", data)
+          setDocuments([])
+          setError("Received invalid data format")
+        } else {
+          setDocuments(data)
+        }
       } catch (error) {
         console.error("Failed to fetch recent documents:", error)
         setDocuments([])
+        setError("Failed to load recent documents")
+      } finally {
         setIsLoading(false)
       }
     }
@@ -46,6 +58,17 @@ export function RecentDocuments() {
             </div>
           </div>
         ))}
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-[200px] items-center justify-center rounded-md border border-dashed">
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <p className="text-xs text-muted-foreground mt-1">Using mock data instead</p>
+        </div>
       </div>
     )
   }

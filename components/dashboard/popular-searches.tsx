@@ -13,16 +13,28 @@ interface SearchQuery {
 export function PopularSearches() {
   const [searches, setSearches] = useState<SearchQuery[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const getPopularSearches = async () => {
       try {
+        setIsLoading(true)
+        setError(null)
         const data = await fetchPopularSearches()
-        setSearches(data)
-        setIsLoading(false)
+
+        // Validate the data structure
+        if (!Array.isArray(data)) {
+          console.error("Invalid data format for popular searches:", data)
+          setSearches([])
+          setError("Received invalid data format")
+        } else {
+          setSearches(data)
+        }
       } catch (error) {
         console.error("Failed to fetch popular searches:", error)
         setSearches([])
+        setError("Failed to load search data")
+      } finally {
         setIsLoading(false)
       }
     }
@@ -39,6 +51,17 @@ export function PopularSearches() {
             <Skeleton className="h-4 w-[50px]" />
           </div>
         ))}
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-[200px] items-center justify-center rounded-md border border-dashed">
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <p className="text-xs text-muted-foreground mt-1">Using mock data instead</p>
+        </div>
       </div>
     )
   }

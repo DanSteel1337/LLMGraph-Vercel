@@ -13,16 +13,47 @@ interface CategoryData {
 export function CategoryDistribution() {
   const [categories, setCategories] = useState<CategoryData[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const getCategoryDistribution = async () => {
       try {
-        const data = await fetchCategoryDistribution()
+        setIsLoading(true)
+        setError(null)
+
+        // Fetch data with a timeout to prevent hanging
+        const timeoutPromise = new Promise<CategoryData[]>((_, reject) => {
+          setTimeout(() => reject(new Error("Request timeout")), 5000)
+        })
+
+        const dataPromise = fetchCategoryDistribution()
+
+        // Race between the data fetch and the timeout
+        const data = (await Promise.race([dataPromise, timeoutPromise])) as CategoryData[]
+
+        // Validate the data structure
+        if (!Array.isArray(data)) {
+          console.error("Invalid data format for category distribution:", data)
+          throw new Error("Invalid data format")
+        }
+
         setCategories(data)
-        setIsLoading(false)
       } catch (error) {
         console.error("Failed to fetch category distribution:", error)
-        setCategories([])
+
+        // Fallback to hardcoded mock data as a last resort
+        setCategories([
+          { name: "Blueprints", count: 42, percentage: 27 },
+          { name: "C++", count: 38, percentage: 24 },
+          { name: "Animation", count: 24, percentage: 15 },
+          { name: "Rendering", count: 18, percentage: 12 },
+          { name: "Physics", count: 14, percentage: 9 },
+          { name: "UI", count: 12, percentage: 8 },
+          { name: "Audio", count: 8, percentage: 5 },
+        ])
+
+        setError("Using fallback data")
+      } finally {
         setIsLoading(false)
       }
     }
@@ -50,6 +81,11 @@ export function CategoryDistribution() {
 
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="rounded-md bg-yellow-50 p-3 text-sm text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
+          {error}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {categories.map((category) => (
           <div key={category.name} className="space-y-2">

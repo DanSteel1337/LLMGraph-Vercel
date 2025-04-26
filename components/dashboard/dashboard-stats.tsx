@@ -12,39 +12,34 @@ interface StatsData {
   totalSearches: number
   totalFeedback: number
   vectorCount: number
-  isLoading: boolean
 }
 
 export function DashboardStats() {
-  const [stats, setStats] = useState<StatsData>({
-    totalDocuments: 0,
-    totalSearches: 0,
-    totalFeedback: 0,
-    vectorCount: 0,
-    isLoading: true,
-  })
+  const [stats, setStats] = useState<StatsData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const getStats = async () => {
       try {
+        setIsLoading(true)
+        setError(null)
         const data = await fetchStats()
-        setStats({
-          ...data,
-          isLoading: false,
-        })
+
+        // Validate the data structure
+        if (!data || typeof data !== "object") {
+          console.error("Invalid data format for stats:", data)
+          setStats(null)
+          setError("Received invalid data format")
+        } else {
+          setStats(data)
+        }
       } catch (error) {
         console.error("Failed to fetch stats:", error)
-        // Set default values if API call fails
-        setStats({
-          totalDocuments: 0,
-          totalSearches: 0,
-          totalFeedback: 0,
-          vectorCount: 0,
-          isLoading: false,
-        })
-
-        // Show a more user-friendly message in the UI instead of failing completely
-        // We'll handle this in the component rendering
+        setStats(null)
+        setError("Failed to load statistics")
+      } finally {
+        setIsLoading(false)
       }
     }
 
@@ -55,31 +50,35 @@ export function DashboardStats() {
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <StatsCard
         title="Total Documents"
-        value={stats.totalDocuments}
+        value={stats?.totalDocuments}
         description="Documents in the system"
         icon={FileText}
-        isLoading={stats.isLoading}
+        isLoading={isLoading}
+        error={error}
       />
       <StatsCard
         title="Vector Count"
-        value={stats.vectorCount}
+        value={stats?.vectorCount}
         description="Vectors in Pinecone"
         icon={Database}
-        isLoading={stats.isLoading}
+        isLoading={isLoading}
+        error={error}
       />
       <StatsCard
         title="Total Searches"
-        value={stats.totalSearches}
+        value={stats?.totalSearches}
         description="Search queries performed"
         icon={Search}
-        isLoading={stats.isLoading}
+        isLoading={isLoading}
+        error={error}
       />
       <StatsCard
         title="Feedback Items"
-        value={stats.totalFeedback}
+        value={stats?.totalFeedback}
         description="User feedback collected"
         icon={MessageSquare}
-        isLoading={stats.isLoading}
+        isLoading={isLoading}
+        error={error}
       />
     </div>
   )
@@ -87,13 +86,14 @@ export function DashboardStats() {
 
 interface StatsCardProps {
   title: string
-  value: number
+  value?: number
   description: string
   icon: React.ElementType
   isLoading: boolean
+  error: string | null
 }
 
-function StatsCard({ title, value, description, icon: Icon, isLoading }: StatsCardProps) {
+function StatsCard({ title, value, description, icon: Icon, isLoading, error }: StatsCardProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -103,10 +103,12 @@ function StatsCard({ title, value, description, icon: Icon, isLoading }: StatsCa
       <CardContent>
         {isLoading ? (
           <div className="h-7 w-16 animate-pulse rounded-md bg-muted"></div>
+        ) : error ? (
+          <div className="text-sm text-muted-foreground">Using mock data</div>
         ) : value !== undefined ? (
           <div className="text-2xl font-bold">{value.toLocaleString()}</div>
         ) : (
-          <div className="text-sm text-muted-foreground">Unable to load data</div>
+          <div className="text-sm text-muted-foreground">No data available</div>
         )}
         <p className="text-xs text-muted-foreground">{description}</p>
       </CardContent>

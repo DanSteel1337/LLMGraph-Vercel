@@ -12,21 +12,15 @@ export function DevelopmentNotice() {
     return null
   }
 
-  const isDevelopment = process.env.NODE_ENV !== "production"
-  const isPreview = typeof window !== "undefined" && window.location.hostname.includes("vercel.app")
-
-  if (!isDevelopment && !isPreview) {
-    return null
-  }
-
   return (
     <Alert variant="warning" className="mb-4">
       <AlertCircle className="h-4 w-4" />
       <div className="flex-1">
-        <AlertTitle>Development Mode</AlertTitle>
+        <AlertTitle>Mock Data Mode</AlertTitle>
         <AlertDescription>
-          You are viewing this application in {isDevelopment ? "development" : "preview"} mode. The application is using
-          mock data since the backend server is not connected.
+          This application is running with mock data. No backend connection is required.
+          <br />
+          <span className="text-xs mt-1 block">All data shown is simulated for demonstration purposes.</span>
         </AlertDescription>
       </div>
       <Button variant="ghost" size="icon" onClick={() => setDismissed(true)}>
