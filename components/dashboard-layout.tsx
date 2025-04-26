@@ -2,14 +2,16 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { BarChart3, FileUp, FolderOpen, Search, MessageSquare, Menu, LogOut } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
+import { BarChart3, FileUp, FolderOpen, Search, MessageSquare, Menu, LogOut, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
+import { logout, getCurrentUser, isAuthenticated } from "@/lib/auth"
+import { useToast } from "@/components/ui/use-toast"
 
 interface NavItem {
   title: string
@@ -48,6 +50,35 @@ const navItems: NavItem[] = [
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const [username, setUsername] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
+  const router = useRouter()
+  const { toast } = useToast()
+
+  useEffect(() => {
+    setMounted(true)
+
+    // Check authentication on client side
+    if (!isAuthenticated()) {
+      router.push("/login")
+    } else {
+      setUsername(getCurrentUser())
+    }
+  }, [router])
+
+  const handleLogout = () => {
+    logout()
+    toast({
+      title: "Logged out",
+      description: "You have been logged out successfully.",
+    })
+    router.push("/login")
+  }
+
+  // Don't render anything until client-side hydration is complete
+  if (!mounted) {
+    return null
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -85,7 +116,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 ))}
               </nav>
               <div className="mt-auto border-t p-4">
-                <Button variant="outline" className="w-full justify-start gap-2">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    <span className="text-sm font-medium">{username}</span>
+                  </div>
+                </div>
+                <Button variant="outline" className="w-full justify-start gap-2" onClick={handleLogout}>
                   <LogOut className="h-4 w-4" />
                   Logout
                 </Button>
@@ -97,6 +134,16 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <h1 className="font-semibold text-lg md:text-xl">UE Documentation RAG</h1>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              <span className="text-sm font-medium">{username}</span>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
           <Button variant="outline" size="sm">
             Help
           </Button>
@@ -128,7 +175,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               ))}
             </nav>
             <div className="mt-auto border-t p-4">
-              <Button variant="outline" className="w-full justify-start gap-2">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  <span className="text-sm font-medium">{username}</span>
+                </div>
+              </div>
+              <Button variant="outline" className="w-full justify-start gap-2" onClick={handleLogout}>
                 <LogOut className="h-4 w-4" />
                 Logout
               </Button>
