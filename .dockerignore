@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+.github
+.vscode
+*.md
+.env*
+!.env.example
+backend/data

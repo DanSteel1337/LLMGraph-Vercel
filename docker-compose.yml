@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"  # Frontend
+      - "8000:8000"  # Backend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+      - PINECONE_HOSTNAME=${PINECONE_HOSTNAME}
+      - JWT_SECRET=${JWT_SECRET}
+    volumes:
+      - ./backend/data:/app/backend/data  # Persist backend data

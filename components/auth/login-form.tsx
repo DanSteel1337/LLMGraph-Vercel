@@ -18,8 +18,6 @@ const formSchema = z.object({
   password: z.string().min(1, { message: "Password is required" }),
 })
 
-type FormValues = z.infer<typeof formSchema>
-
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -27,9 +25,10 @@ export function LoginForm() {
   const { toast } = useToast()
 
   // Get redirect path from URL if available
-  const redirectPath = searchParams.get("redirect") || "/"
+  const redirectPath = searchParams?.get("redirect") || "/"
 
-  const form = useForm<FormValues>({
+  // Initialize the form
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       username: "",
@@ -37,7 +36,8 @@ export function LoginForm() {
     },
   })
 
-  async function onSubmit(values: FormValues) {
+  // Define the submit handler
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
 
     try {
@@ -45,7 +45,9 @@ export function LoginForm() {
       // In a real app, this would call an API
       if (values.username === "admin" && values.password === "password123") {
         // Set a mock token in localStorage
-        localStorage.setItem("auth_token", "mock_token")
+        if (typeof window !== "undefined") {
+          localStorage.setItem("auth_token", "mock_token")
+        }
 
         toast({
           title: "Login successful",

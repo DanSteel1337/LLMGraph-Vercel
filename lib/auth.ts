@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useEffect, createContext, useContext } from "react"
 
 // Define user type
@@ -38,18 +39,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         // In a real app, this would call an API
         // For now, just check if there's a token in localStorage
-        const token = localStorage.getItem("auth_token")
+        if (typeof window !== "undefined") {
+          const token = localStorage.getItem("auth_token")
 
-        if (token) {
-          // Mock user data
-          setUser({
-            id: "1",
-            username: "admin",
-            name: "Admin User",
-            role: "admin",
-          })
-        } else {
-          setUser(null)
+          if (token) {
+            // Mock user data
+            setUser({
+              id: "1",
+              username: "admin",
+              name: "Admin User",
+              role: "admin",
+            })
+          } else {
+            setUser(null)
+          }
         }
       } catch (error) {
         console.error("Auth check error:", error)
@@ -75,7 +78,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // In a real app, this would call an API
       if (username === "admin" && password === "password123") {
         // Set a mock token in localStorage
-        localStorage.setItem("auth_token", "mock_token")
+        if (typeof window !== "undefined") {
+          localStorage.setItem("auth_token", "mock_token")
+        }
 
         // Set user data
         setUser({
@@ -103,7 +108,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true)
 
       // In a real app, this would call an API
-      localStorage.removeItem("auth_token")
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("auth_token")
+      }
 
       setUser(null)
     } catch (error) {

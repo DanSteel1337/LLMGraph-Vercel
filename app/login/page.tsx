@@ -1,18 +1,6 @@
-import dynamic from "next/dynamic"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-
-// Dynamically import the login form with error handling
-const LoginForm = dynamic(() => import("@/components/auth/login-form").then((mod) => mod.LoginForm), {
-  ssr: true,
-  loading: () => (
-    <div className="space-y-4">
-      <Skeleton className="h-10 w-full" />
-      <Skeleton className="h-10 w-full" />
-      <Skeleton className="h-10 w-full mt-6" />
-    </div>
-  ),
-})
+import { LoginForm } from "@/components/auth/login-form"
+import { ErrorBoundary } from "@/components/error-boundary"
 
 export default function LoginPage() {
   return (
@@ -23,7 +11,9 @@ export default function LoginPage() {
           <CardDescription>Enter your credentials to access the dashboard</CardDescription>
         </CardHeader>
         <CardContent>
-          <LoginForm />
+          <ErrorBoundary>
+            <LoginForm />
+          </ErrorBoundary>
         </CardContent>
       </Card>
     </div>
