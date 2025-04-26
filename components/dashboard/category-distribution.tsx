@@ -22,6 +22,7 @@ export function CategoryDistribution() {
         setIsLoading(false)
       } catch (error) {
         console.error("Failed to fetch category distribution:", error)
+        setCategories([])
         setIsLoading(false)
       }
     }

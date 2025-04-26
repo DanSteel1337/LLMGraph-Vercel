@@ -22,6 +22,7 @@ export function PopularSearches() {
         setIsLoading(false)
       } catch (error) {
         console.error("Failed to fetch popular searches:", error)
+        setSearches([])
         setIsLoading(false)
       }
     }

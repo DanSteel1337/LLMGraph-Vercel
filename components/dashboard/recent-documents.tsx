@@ -26,6 +26,7 @@ export function RecentDocuments() {
         setIsLoading(false)
       } catch (error) {
         console.error("Failed to fetch recent documents:", error)
+        setDocuments([])
         setIsLoading(false)
       }
     }

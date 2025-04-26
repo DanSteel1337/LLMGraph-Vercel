@@ -4,10 +4,13 @@ import { DashboardStats } from "@/components/dashboard/dashboard-stats"
 import { RecentDocuments } from "@/components/dashboard/recent-documents"
 import { PopularSearches } from "@/components/dashboard/popular-searches"
 import { CategoryDistribution } from "@/components/dashboard/category-distribution"
+import { DevelopmentNotice } from "@/components/development-notice"
 
 export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-4">
+      <DevelopmentNotice />
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground">Overview of your Unreal Engine documentation RAG system</p>

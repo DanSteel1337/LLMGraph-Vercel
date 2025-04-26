@@ -34,7 +34,17 @@ export function DashboardStats() {
         })
       } catch (error) {
         console.error("Failed to fetch stats:", error)
-        setStats((prev) => ({ ...prev, isLoading: false }))
+        // Set default values if API call fails
+        setStats({
+          totalDocuments: 0,
+          totalSearches: 0,
+          totalFeedback: 0,
+          vectorCount: 0,
+          isLoading: false,
+        })
+
+        // Show a more user-friendly message in the UI instead of failing completely
+        // We'll handle this in the component rendering
       }
     }
 
@@ -93,8 +103,10 @@ function StatsCard({ title, value, description, icon: Icon, isLoading }: StatsCa
       <CardContent>
         {isLoading ? (
           <div className="h-7 w-16 animate-pulse rounded-md bg-muted"></div>
-        ) : (
+        ) : value !== undefined ? (
           <div className="text-2xl font-bold">{value.toLocaleString()}</div>
+        ) : (
+          <div className="text-sm text-muted-foreground">Unable to load data</div>
         )}
         <p className="text-xs text-muted-foreground">{description}</p>
       </CardContent>
