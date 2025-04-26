@@ -124,7 +124,13 @@ export function PopularSearches() {
             <div className="flex items-center gap-2">
               <div className="text-sm text-muted-foreground">{search.count} searches</div>
               <div
-                className={`text-xs ${search.successRate >= 70 ? "text-green-500" : search.successRate >= 40 ? "text-yellow-500" : "text-red-500"}`}
+                className={`text-xs ${
+                  search.successRate >= 70
+                    ? "text-green-500"
+                    : search.successRate >= 40
+                      ? "text-yellow-500"
+                      : "text-red-500"
+                }`}
               >
                 {search.successRate}% success
               </div>
@@ -156,7 +162,13 @@ export function PopularSearches() {
           <div className="flex items-center gap-2">
             <div className="text-sm text-muted-foreground">{search.count} searches</div>
             <div
-              className={`text-xs ${search.successRate >= 70 ? "text-green-500" : search.successRate >= 40 ? "text-yellow-500" : "text-red-500"}`}
+              className={`text-xs ${
+                search.successRate >= 70
+                  ? "text-green-500"
+                  : search.successRate >= 40
+                    ? "text-yellow-500"
+                    : "text-red-500"
+              }`}
             >
               {search.successRate}% success
             </div>

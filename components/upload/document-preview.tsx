@@ -145,7 +145,7 @@ export function DocumentPreview({ file, className }: DocumentPreviewProps) {
               title="PDF Preview"
               sandbox="allow-scripts"
               loading="lazy"
-            />
+            ></iframe>
           </div>
         )}
 

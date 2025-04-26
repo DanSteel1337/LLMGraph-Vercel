@@ -1,16 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Disable static generation for specific paths
-  experimental: {
-    // This ensures the upload page is not statically generated
-    appDir: true,
+  typescript: {
+    // This will ignore TypeScript errors during build
+    ignoreBuildErrors: true,
   },
   eslint: {
+    // This will ignore ESLint errors during build
     ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
   },
   images: {
     unoptimized: true,
