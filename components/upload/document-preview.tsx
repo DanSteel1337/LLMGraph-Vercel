@@ -139,13 +139,7 @@ export function DocumentPreview({ file, className }: DocumentPreviewProps) {
       <CardContent>
         {previewType === "pdf" && preview && (
           <div className="h-[400px] w-full overflow-hidden rounded border">
-            <iframe
-              src={preview}
-              className="h-full w-full"
-              title="PDF Preview"
-              sandbox="allow-scripts"
-              loading="lazy"
-            ></iframe>
+            <iframe src={preview} className="h-full w-full" title="PDF Preview" sandbox="allow-scripts"></iframe>
           </div>
         )}
 
@@ -155,7 +149,6 @@ export function DocumentPreview({ file, className }: DocumentPreviewProps) {
               src={preview || "/placeholder.svg"}
               alt="Document Preview"
               className="max-w-full max-h-full object-contain"
-              loading="lazy"
             />
           </div>
         )}
