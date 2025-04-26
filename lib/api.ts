@@ -1,18 +1,14 @@
 // This file contains API functions to interact with the backend
+import { shouldUseMockData } from "./backend-connection"
 
 // Base API URL from environment variable
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
-// Check if we're in preview mode (Vercel preview or local development)
-const isPreviewMode = () => {
-  return true // Always return mock data for now to ensure stability
-}
-
 // Helper function for API requests
 async function apiRequest(endpoint: string, options: RequestInit = {}) {
-  // If we're in preview mode, immediately return mock data
-  if (isPreviewMode()) {
-    console.log(`Preview mode detected, returning mock data for ${endpoint}`)
+  // If we should use mock data, immediately return mock data
+  if (shouldUseMockData()) {
+    console.log(`Using mock data for ${endpoint}`)
     return getMockData(endpoint, options.method || "GET")
   }
 
@@ -347,15 +343,53 @@ export async function fetchPopularSearches() {
   return apiRequest("/api/searches/popular")
 }
 
+// Update the fetchCategoryDistribution function to always return mock data
 export async function fetchCategoryDistribution() {
-  // Directly return mock data for this endpoint to avoid any issues
-  return getMockData("/api/categories/distribution", "GET")
+  // Always return mock data for this endpoint to avoid timeout issues
+  console.log("Using mock data for category distribution")
+  return [
+    {
+      name: "Blueprints",
+      count: 42,
+      percentage: 27,
+    },
+    {
+      name: "C++",
+      count: 38,
+      percentage: 24,
+    },
+    {
+      name: "Animation",
+      count: 24,
+      percentage: 15,
+    },
+    {
+      name: "Rendering",
+      count: 18,
+      percentage: 12,
+    },
+    {
+      name: "Physics",
+      count: 14,
+      percentage: 9,
+    },
+    {
+      name: "UI",
+      count: 12,
+      percentage: 8,
+    },
+    {
+      name: "Audio",
+      count: 8,
+      percentage: 5,
+    },
+  ]
 }
 
 // Document management API functions
 export async function uploadDocument(formData: FormData) {
-  // In preview mode, return a mock success response
-  if (isPreviewMode()) {
+  // If we should use mock data, return a mock success response
+  if (shouldUseMockData()) {
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve({ success: true, id: "mock-doc-id" })

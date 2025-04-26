@@ -16,11 +16,13 @@ export function DevelopmentNotice() {
     <Alert variant="warning" className="mb-4">
       <AlertCircle className="h-4 w-4" />
       <div className="flex-1">
-        <AlertTitle>Mock Data Mode</AlertTitle>
+        <AlertTitle>Development Mode</AlertTitle>
         <AlertDescription>
-          This application is running with mock data. No backend connection is required.
+          This application is running in development mode with mock data.
           <br />
-          <span className="text-xs mt-1 block">All data shown is simulated for demonstration purposes.</span>
+          <span className="text-xs mt-1 block">
+            Connect to a backend API by setting the NEXT_PUBLIC_API_URL environment variable.
+          </span>
         </AlertDescription>
       </div>
       <Button variant="ghost" size="icon" onClick={() => setDismissed(true)}>
