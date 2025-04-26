@@ -2,11 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   typescript: {
-    // This will ignore TypeScript errors during build
     ignoreBuildErrors: true,
   },
   eslint: {
-    // This will ignore ESLint errors during build
     ignoreDuringBuilds: true,
   },
   images: {

@@ -139,7 +139,10 @@ export function DocumentPreview({ file, className }: DocumentPreviewProps) {
       <CardContent>
         {previewType === "pdf" && preview && (
           <div className="h-[400px] w-full overflow-hidden rounded border">
-            <iframe src={preview} className="h-full w-full" title="PDF Preview" sandbox="allow-scripts"></iframe>
+            {/* Removed iframe for safety */}
+            <div className="flex items-center justify-center h-full bg-muted">
+              <p className="text-sm text-muted-foreground">PDF preview is not available in this view.</p>
+            </div>
           </div>
         )}
 
