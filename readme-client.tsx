@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
-import { ErrorBoundary } from "./error-boundary"
+import { ErrorBoundary } from "./components/error-boundary"
 
 // Dynamically import the markdown renderer with ssr: false
 const ReactMarkdown = dynamic(() => import("react-markdown"), {

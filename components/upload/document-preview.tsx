@@ -170,12 +170,9 @@ export function DocumentPreview({ file, className }: DocumentPreviewProps) {
               <TabsTrigger value="source">Source</TabsTrigger>
             </TabsList>
             <TabsContent value="rendered" className="h-[400px] overflow-auto border rounded">
-              <ErrorBoundary>
-                <div
-                  className="p-4 prose prose-sm dark:prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: preview }}
-                />
-              </ErrorBoundary>
+              <div className="p-4 prose prose-sm dark:prose-invert max-w-none">
+                <p className="text-sm text-muted-foreground">HTML preview is not available for security reasons.</p>
+              </div>
             </TabsContent>
             <TabsContent value="source" className="h-[400px] overflow-auto">
               <pre className="text-xs p-4 bg-muted rounded font-mono">{preview}</pre>
