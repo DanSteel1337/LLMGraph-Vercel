@@ -4,7 +4,12 @@ import { shouldUseMockData } from "./backend-connection"
 // Base API URL from environment variable
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
-// Helper function for API requests
+// Helper function to log API errors consistently
+function logApiError(endpoint: string, error: any, message: string) {
+  console.error(`API Error (${endpoint}): ${message}`, error instanceof Error ? error.message : error)
+}
+
+// Improved apiRequest function with better error handling for non-JSON responses
 async function apiRequest(endpoint: string, options: RequestInit = {}) {
   // If we should use mock data, immediately return mock data
   if (shouldUseMockData()) {
@@ -29,29 +34,36 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
   try {
     const response = await fetch(url, config)
 
+    // Check if the response is OK (status in the range 200-299)
     if (!response.ok) {
-      console.warn(`API request failed with status ${response.status}: ${response.statusText}`)
+      logApiError(
+        endpoint,
+        { status: response.status, statusText: response.statusText },
+        `Request failed with status ${response.status}`,
+      )
       return getMockData(endpoint, options.method || "GET")
     }
 
-    // Check if the response is empty
-    const text = await response.text()
-    if (!text) {
-      console.warn(`Empty response from ${endpoint}, using mock data instead`)
+    // Check the content type to ensure we're getting JSON
+    const contentType = response.headers.get("content-type")
+    if (!contentType || !contentType.includes("application/json")) {
+      logApiError(endpoint, { contentType }, `Expected JSON but got ${contentType || "unknown content type"}`)
       return getMockData(endpoint, options.method || "GET")
     }
 
     // Try to parse the response as JSON
     try {
-      return JSON.parse(text)
+      const data = await response.json()
+      return data
     } catch (parseError) {
-      console.error(`Failed to parse JSON from ${endpoint}:`, parseError)
-      console.error(`Response text:`, text.substring(0, 100) + (text.length > 100 ? "..." : ""))
+      // If JSON parsing fails, log the first 100 characters of the response
+      const text = await response.text()
+      logApiError(endpoint, parseError, `Failed to parse JSON response: ${text.substring(0, 100)}...`)
       // Fall back to mock data if JSON parsing fails
       return getMockData(endpoint, options.method || "GET")
     }
   } catch (error) {
-    console.error(`API request to ${endpoint} failed:`, error)
+    logApiError(endpoint, error, "Request failed")
     // Return mock data for any request error
     return getMockData(endpoint, options.method || "GET")
   }
@@ -227,8 +239,6 @@ function getMockData(endpoint: string, method: string) {
         category: "Physics",
         version: "UE 5.2",
         uploadedAt: "2025-04-21T15:45:00.000Z",
-        status: "processed",
-        size: 320000,
       },
     ]
   }

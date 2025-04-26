@@ -1,7 +1,49 @@
 "use client"
 
-import { DocumentUploadForm } from "./document-upload-form"
+import { Suspense } from "react"
+import dynamic from "next/dynamic"
+import { Skeleton } from "@/components/ui/skeleton"
+
+// Import the form component with dynamic import
+const DocumentUploadForm = dynamic(
+  () => import("./document-upload-form").then((mod) => ({ default: mod.DocumentUploadForm })),
+  {
+    loading: () => <UploadFormSkeleton />,
+  },
+)
+
+// Loading fallback component
+function UploadFormSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Skeleton className="h-8 w-3/4" />
+      <Skeleton className="h-4 w-1/2" />
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-1/4" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-1/4" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-1/4" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+      <div className="flex justify-between">
+        <Skeleton className="h-10 w-24" />
+        <Skeleton className="h-10 w-36" />
+      </div>
+    </div>
+  )
+}
 
 export default function DocumentUploadFormWrapper() {
-  return <DocumentUploadForm />
+  return (
+    <Suspense fallback={<UploadFormSkeleton />}>
+      <DocumentUploadForm />
+    </Suspense>
+  )
 }

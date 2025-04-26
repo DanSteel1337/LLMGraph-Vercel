@@ -19,6 +19,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { uploadDocument } from "@/lib/api"
+// Import the DocumentPreview component at the top of the file
+import { DocumentPreview } from "./document-preview"
 
 // Define allowed file types with their MIME types and extensions
 const ALLOWED_FILE_TYPES = [
@@ -133,12 +135,14 @@ const versions = [
   { value: "4.27", label: "UE 4.27" },
 ]
 
-export function DocumentUploadForm() {
+function DocumentUploadFormComponent() {
   const router = useRouter()
   const [isUploading, setIsUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  // Add a state for toggling preview visibility after the other state declarations
+  const [showPreview, setShowPreview] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dropZoneRef = useRef<HTMLDivElement>(null)
 
@@ -474,6 +478,23 @@ export function DocumentUploadForm() {
                         )}
                       </div>
                     </FormControl>
+                    {selectedFile && (
+                      <div className="mt-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowPreview(!showPreview)}
+                            className="text-xs"
+                          >
+                            {showPreview ? "Hide Preview" : "Show Preview"}
+                          </Button>
+                        </div>
+
+                        {showPreview && <DocumentPreview file={selectedFile} className="mt-2" />}
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -597,3 +618,5 @@ export function DocumentUploadForm() {
     </Card>
   )
 }
+
+export { DocumentUploadFormComponent as DocumentUploadForm }
