@@ -3,7 +3,7 @@
 import type React from "react"
 import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
-import { useAuth } from "@/lib/auth"
+import { isAuthenticated } from "@/lib/auth"
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -12,19 +12,17 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, router }: ProtectedRouteProps) {
   const [isLoading, setIsLoading] = useState(true)
-  const { user, loading } = useAuth()
 
   useEffect(() => {
-    // Only redirect if auth check is complete and user is not authenticated
-    if (!loading && !user) {
+    // Check if the user is authenticated
+    if (!isAuthenticated()) {
       router.push("/login")
-    } else if (!loading) {
-      // Auth check complete and user is authenticated
+    } else {
       setIsLoading(false)
     }
-  }, [user, loading, router])
+  }, [router])
 
-  if (loading || isLoading) {
+  if (isLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
