@@ -9,10 +9,19 @@ export async function middleware(request: NextRequest) {
   const isPublicPath = path === "/login"
 
   // Get the token from the cookies
-  const token = request.cookies.get("auth_token")?.value || request.headers.get("authorization")?.split(" ")[1]
+  const token = request.cookies.get("auth_token")?.value
 
-  // For client-side auth, we'll rely on localStorage which the middleware can't access
-  // So we'll just check if we're on a public path and there's a token in the cookie
+  // If the path is not public and there's no token, redirect to login
+  if (!isPublicPath && !token) {
+    // Create a new URL for the login page
+    const url = request.nextUrl.clone()
+    url.pathname = "/login"
+
+    // Add the original URL as a parameter to redirect after login
+    url.search = `?redirect=${path}`
+
+    return NextResponse.redirect(url)
+  }
 
   // If the path is login and there's a valid token, redirect to home
   if (isPublicPath && token) {

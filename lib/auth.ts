@@ -77,12 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // In a real app, this would call an API
       if (username === "admin" && password === "password123") {
-        // Set a mock token in localStorage with an expiration time
-        const token = {
-          value: "mock_token",
-          expires: Date.now() + 24 * 60 * 60 * 1000, // 24 hours from now
-        }
-        localStorage.setItem("auth_token", JSON.stringify(token))
+        // Set a mock token in localStorage
+        localStorage.setItem("auth_token", "mock_token")
 
         // Set user data
         setUser({
@@ -137,22 +133,6 @@ export function isAuthenticated(): boolean {
     return false
   }
 
-  const tokenData = localStorage.getItem("auth_token")
-  if (!tokenData) {
-    return false
-  }
-
-  try {
-    const token = JSON.parse(tokenData)
-    // Check if token is expired
-    if (token.expires && token.expires < Date.now()) {
-      // Token expired, remove it
-      localStorage.removeItem("auth_token")
-      return false
-    }
-    return true
-  } catch (e) {
-    // If the token is not in JSON format (old format), consider it valid for backward compatibility
-    return true
-  }
+  const token = localStorage.getItem("auth_token")
+  return !!token
 }
