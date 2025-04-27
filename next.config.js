@@ -10,6 +10,10 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  output: "standalone",
+  experimental: {
+    serverComponentsExternalPackages: ["sharp"],
+  },
 }
 
 module.exports = nextConfig

@@ -3,16 +3,15 @@
 import type React from "react"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { isAuthenticated } from "@/lib/auth"
 import { Loader2 } from "lucide-react"
+import { isAuthenticated } from "@/lib/auth"
 
 interface ProtectedRouteProps {
   children: React.ReactNode
+  router: any
 }
 
-export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const router = useRouter()
+export function ProtectedRoute({ children, router }: ProtectedRouteProps) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {

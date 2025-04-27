@@ -3,7 +3,6 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
 import { BarChart3, FileUp, FolderOpen, Search, MessageSquare, Menu, LogOut, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -47,10 +46,14 @@ const navItems: NavItem[] = [
   },
 ]
 
-export function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname()
+interface DashboardLayoutProps {
+  children: React.ReactNode
+  pathname: string
+  router: any
+}
+
+export function DashboardLayout({ children, pathname, router }: DashboardLayoutProps) {
   const [open, setOpen] = useState(false)
-  const router = useRouter()
   const { toast } = useToast()
   const { user, logout, loading } = useAuth()
   const [mounted, setMounted] = useState(false)
@@ -59,11 +62,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  // Don't render the dashboard layout on the login page
-  if (pathname === "/login") {
-    return <>{children}</>
-  }
 
   // Show loading state while checking authentication
   if (loading) {

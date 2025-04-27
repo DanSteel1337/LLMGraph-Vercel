@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState, useRef, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -19,7 +18,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { uploadDocument } from "@/lib/api"
-// Import the DocumentPreview component at the top of the file
 import { DocumentPreview } from "./document-preview"
 
 // Define allowed file types with their MIME types and extensions
@@ -135,13 +133,15 @@ const versions = [
   { value: "4.27", label: "UE 4.27" },
 ]
 
-function DocumentUploadFormComponent() {
-  const router = useRouter()
+interface DocumentUploadFormProps {
+  router: any
+}
+
+export function DocumentUploadForm({ router }: DocumentUploadFormProps) {
   const [isUploading, setIsUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  // Add a state for toggling preview visibility after the other state declarations
   const [showPreview, setShowPreview] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dropZoneRef = useRef<HTMLDivElement>(null)
@@ -354,6 +354,10 @@ function DocumentUploadFormComponent() {
     }
   }
 
+  // Rest of the component remains the same...
+  // (I'm omitting the JSX part for brevity since it doesn't change)
+
+  // Return the JSX for the form
   return (
     <Card>
       <CardHeader>
@@ -618,5 +622,3 @@ function DocumentUploadFormComponent() {
     </Card>
   )
 }
-
-export { DocumentUploadFormComponent as DocumentUploadForm }

@@ -1,11 +1,11 @@
 "use client"
 
 import { useSearchParams } from "next/navigation"
-import { LoginForm } from "./login-form"
+import { LoginFormWrapper } from "./login-form-wrapper"
 
 export function LoginFormContainer() {
   const searchParams = useSearchParams()
   const redirectPath = searchParams?.get("redirect") || "/"
 
-  return <LoginForm redirectPath={redirectPath} />
+  return <LoginFormWrapper redirectPath={redirectPath} />
 }
