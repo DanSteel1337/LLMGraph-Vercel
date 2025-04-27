@@ -11,9 +11,7 @@ const nextConfig = {
     unoptimized: true,
   },
   output: "standalone",
-  experimental: {
-    serverComponentsExternalPackages: ["sharp"],
-  },
+  serverExternalPackages: ["sharp"], // Updated from experimental.serverComponentsExternalPackages
 }
 
 module.exports = nextConfig
