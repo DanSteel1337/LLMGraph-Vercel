@@ -75,6 +75,15 @@ export function DashboardLayout({ children, pathname, router }: DashboardLayoutP
     )
   }
 
+  // Add a check for user authentication
+  if (!user) {
+    // If not authenticated and not loading, redirect to login
+    if (typeof window !== "undefined" && !loading) {
+      router.push("/login")
+    }
+    return null
+  }
+
   const handleLogout = async () => {
     try {
       await logout()

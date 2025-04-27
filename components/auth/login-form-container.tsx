@@ -1,16 +1,12 @@
 "use client"
 
-import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { LoginForm } from "./login-form"
 
 export function LoginFormContainer() {
+  // Get the redirect path from the URL query parameters
   const searchParams = useSearchParams()
   const redirectPath = searchParams?.get("redirect") || "/"
 
-  return (
-    <Suspense fallback={<div>Loading form...</div>}>
-      <LoginForm redirectPath={redirectPath} />
-    </Suspense>
-  )
+  return <LoginForm redirectPath={redirectPath} />
 }

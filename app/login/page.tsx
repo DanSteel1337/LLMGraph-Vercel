@@ -1,7 +1,6 @@
 import { Suspense } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { LoginFormContainer } from "@/components/auth/login-form-container"
-import { ErrorBoundary } from "@/components/error-boundary"
 
 // Loading fallback for the login form
 function LoginFormSkeleton() {
@@ -29,11 +28,9 @@ export default function LoginPage() {
           <CardDescription>Enter your credentials to access the dashboard</CardDescription>
         </CardHeader>
         <CardContent>
-          <ErrorBoundary>
-            <Suspense fallback={<LoginFormSkeleton />}>
-              <LoginFormContainer />
-            </Suspense>
-          </ErrorBoundary>
+          <Suspense fallback={<LoginFormSkeleton />}>
+            <LoginFormContainer />
+          </Suspense>
         </CardContent>
       </Card>
     </div>

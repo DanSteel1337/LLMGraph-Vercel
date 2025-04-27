@@ -2,21 +2,24 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { z } from "zod"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
-import { ErrorBoundary } from "@/components/error-boundary"
+import { Label } from "@/components/ui/label"
+import { useAuth } from "@/lib/auth"
 
 // Define the form schema
 const formSchema = z.object({
   username: z.string().min(1, { message: "Username is required" }),
   password: z.string().min(1, { message: "Password is required" }),
 })
+
+// Define the form values type
+type FormValues = z.infer<typeof formSchema>
 
 interface LoginFormProps {
   redirectPath?: string
@@ -26,9 +29,14 @@ export function LoginForm({ redirectPath = "/" }: LoginFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+  const { login } = useAuth() // Add this line to use the auth hook
 
-  // Initialize the form
-  const form = useForm<z.infer<typeof formSchema>>({
+  // Initialize the form without using the Form component
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       username: "",
@@ -37,18 +45,14 @@ export function LoginForm({ redirectPath = "/" }: LoginFormProps) {
   })
 
   // Define the submit handler
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  const onSubmit = async (data: FormValues) => {
+    setIsLoading(true)
+
     try {
-      setIsLoading(true)
+      // Use the login function from the auth hook
+      const success = await login(data.username, data.password)
 
-      // Simple mock login for demonstration
-      // In a real app, this would call an API
-      if (values.username === "admin" && values.password === "password123") {
-        // Set a mock token in localStorage
-        if (typeof window !== "undefined") {
-          localStorage.setItem("auth_token", "mock_token")
-        }
-
+      if (success) {
         toast({
           title: "Login successful",
           description: "You have been logged in successfully.",
@@ -56,7 +60,6 @@ export function LoginForm({ redirectPath = "/" }: LoginFormProps) {
 
         // Navigate to the redirect path
         router.push(redirectPath)
-        router.refresh()
       } else {
         toast({
           title: "Login failed",
@@ -76,48 +79,31 @@ export function LoginForm({ redirectPath = "/" }: LoginFormProps) {
     }
   }
 
+  // Use a more basic form approach without the Form component
   return (
-    <ErrorBoundary>
-      <Form {...form}>
-        <form onSubmit={(e) => void form.handleSubmit(onSubmit)(e)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="username"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Username</FormLabel>
-                <FormControl>
-                  <Input placeholder="Enter your username" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Password</FormLabel>
-                <FormControl>
-                  <Input type="password" placeholder="Enter your password" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Logging in...
-              </>
-            ) : (
-              "Login"
-            )}
-          </Button>
-        </form>
-      </Form>
-    </ErrorBoundary>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="username">Username</Label>
+        <Input id="username" placeholder="Enter your username" {...register("username")} />
+        {errors.username && <p className="text-sm text-red-500">{errors.username.message}</p>}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="password">Password</Label>
+        <Input id="password" type="password" placeholder="Enter your password" {...register("password")} />
+        {errors.password && <p className="text-sm text-red-500">{errors.password.message}</p>}
+      </div>
+
+      <Button type="submit" className="w-full" disabled={isLoading}>
+        {isLoading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Logging in...
+          </>
+        ) : (
+          "Login"
+        )}
+      </Button>
+    </form>
   )
 }
