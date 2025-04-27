@@ -38,9 +38,9 @@ export function LoginForm({ redirectPath = "/" }: LoginFormProps) {
 
   // Define the submit handler
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsLoading(true)
-
     try {
+      setIsLoading(true)
+
       // Simple mock login for demonstration
       // In a real app, this would call an API
       if (values.username === "admin" && values.password === "password123") {
@@ -79,7 +79,7 @@ export function LoginForm({ redirectPath = "/" }: LoginFormProps) {
   return (
     <ErrorBoundary>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={(e) => void form.handleSubmit(onSubmit)(e)} className="space-y-4">
           <FormField
             control={form.control}
             name="username"
