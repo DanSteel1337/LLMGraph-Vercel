@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
 import { Label } from "@/components/ui/label"
+import { useAuth } from "@/lib/auth"
 
 // Define the form schema
 const formSchema = z.object({
@@ -28,6 +29,7 @@ export function LoginForm({ redirectPath = "/" }: LoginFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+  const { login } = useAuth() // Use the auth hook
 
   // Initialize the form without using the Form component
   const {
@@ -47,11 +49,10 @@ export function LoginForm({ redirectPath = "/" }: LoginFormProps) {
     setIsLoading(true)
 
     try {
-      // Simple mock login for demonstration
-      if (data.username === "admin" && data.password === "password123") {
-        // Set a mock token in localStorage
-        localStorage.setItem("auth_token", "mock_token")
+      // Use the login function from the auth hook
+      const success = await login(data.username, data.password)
 
+      if (success) {
         toast({
           title: "Login successful",
           description: "You have been logged in successfully.",
