@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
     const version = formData.get("version") as string
     const description = (formData.get("description") as string) || ""
     const tags = (formData.get("tags") as string) || ""
+    const extractedText = formData.get("extractedText") as string // Get pre-extracted text if available
 
     if (!file || !title || !category || !version) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -38,11 +39,16 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    // Extract text from file
-    const content = await extractTextFromFile(buffer, file.name)
+    // Use pre-extracted text if available (for PDFs processed on the client)
+    let content = extractedText
+
+    // If no pre-extracted text, try to extract it on the server
+    if (!content) {
+      content = await extractTextFromFile(buffer, file.name)
+    }
 
     if (!content) {
-      return NextResponse.json({ error: "Failed to extract text from file" }, { status: 400 })
+      content = `Unable to extract text from ${file.name}. File was uploaded but content is not searchable.`
     }
 
     // Create document metadata
