@@ -1,15 +1,18 @@
-// This is a browser-only file
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/types/supabase"
+
+// Check if we're in a browser environment
+const isBrowser = typeof window !== "undefined"
 
 // Create a true singleton for the Supabase client
 let supabaseInstance: ReturnType<typeof createClientComponentClient<Database>> | null = null
 
 export const getSupabaseClient = () => {
-  if (typeof window === "undefined") {
-    // We're on the server - create a new instance each time
-    // This is safe because server has different contexts for each request
-    return createClientComponentClient<Database>()
+  // Only create the client in browser environments
+  if (!isBrowser) {
+    // Return a mock client or null for server environment
+    // This prevents "self is not defined" errors
+    return null
   }
 
   // We're on the client - use singleton pattern

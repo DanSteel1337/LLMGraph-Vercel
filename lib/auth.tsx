@@ -1,109 +1,180 @@
 "use client"
 
 import type React from "react"
+import { createContext, useContext, useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { User, Session } from "@supabase/supabase-js"
+import { useToast } from "@/components/ui/use-toast"
 
-import { useEffect, useState, createContext, useContext } from "react"
-import type { User } from "@supabase/supabase-js"
-import { supabaseClient } from "./supabase/client"
+// Check if we're in a browser environment
+const isBrowser = typeof window !== "undefined"
 
-type AuthContextType = {
-  user: User | null
-  isLoading: boolean
-  isAuthenticated: boolean
-  signIn: (email: string, password: string) => Promise<{ error: any | null }>
-  signOut: () => Promise<void>
+// Create a default context value
+const defaultAuthValue = {
+  user: null,
+  session: null,
+  isLoading: true,
+  signIn: async () => ({ success: false, error: "Auth not available" }),
+  signOut: async () => {},
+  refreshSession: async () => {},
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+// Create a context with default values
+const AuthContext = createContext(defaultAuthValue)
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+// Safe hook that doesn't throw when used outside provider
+export const useAuth = () => {
+  const context = useContext(AuthContext)
+  // Return default context if not within provider
+  // This prevents errors during static generation
+  if (context === undefined) {
+    console.warn("useAuth was called outside of AuthProvider - using default values")
+    return defaultAuthValue
+  }
+  return context
+}
+
+// Types for the auth context
+export type AuthContextType = {
+  user: User | null
+  session: Session | null
+  isLoading: boolean
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  signOut: () => Promise<void>
+  refreshSession: () => Promise<void>
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const router = useRouter()
+  const { toast } = useToast()
+
+  // Only create the client in browser environments
+  const supabase = isBrowser ? createClientComponentClient() : null
 
   useEffect(() => {
-    // Skip auth check during SSR to avoid hydration mismatch
-    if (typeof window === "undefined") {
-      return
-    }
+    // Skip if not in browser
+    if (!isBrowser || !supabase) return
 
-    const checkUser = async () => {
+    // Check for existing session
+    const checkSession = async () => {
       try {
         const {
-          data: { session },
-        } = await supabaseClient.auth.getSession()
-        setUser(session?.user || null)
-        setIsAuthenticated(!!session?.user)
+          data: { session: activeSession },
+        } = await supabase.auth.getSession()
+
+        if (activeSession) {
+          setSession(activeSession)
+          setUser(activeSession.user)
+        }
       } catch (error) {
-        console.error("Error checking auth status:", error)
-        setUser(null)
-        setIsAuthenticated(false)
+        console.error("Error checking session:", error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    checkUser()
+    checkSession()
 
+    // Set up auth state listener
     const {
       data: { subscription },
-    } = supabaseClient.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null)
-      setIsAuthenticated(!!session?.user)
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession)
+      setUser(newSession?.user || null)
       setIsLoading(false)
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [supabase])
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabaseClient.auth.signInWithPassword({
+      setIsLoading(true)
+
+      if (!supabase) {
+        throw new Error("Supabase client not available")
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
-      return { error }
-    } catch (error) {
-      console.error("Error signing in:", error)
-      return { error }
+
+      if (error) {
+        throw error
+      }
+
+      setUser(data.user)
+      setSession(data.session)
+
+      return { success: true }
+    } catch (error: any) {
+      console.error("Sign in error:", error)
+      return {
+        success: false,
+        error: error.message || "Failed to sign in. Please check your credentials and try again.",
+      }
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const signOut = async () => {
     try {
-      await supabaseClient.auth.signOut()
+      setIsLoading(true)
+
+      if (!supabase) {
+        throw new Error("Supabase client not available")
+      }
+
+      await supabase.auth.signOut()
+      setUser(null)
+      setSession(null)
+      router.push("/login")
     } catch (error) {
-      console.error("Error signing out:", error)
+      console.error("Sign out error:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const refreshSession = async () => {
+    try {
+      setIsLoading(true)
+
+      if (!supabase) {
+        throw new Error("Supabase client not available")
+      }
+
+      const {
+        data: { session: refreshedSession },
+      } = await supabase.auth.refreshSession()
+
+      if (refreshedSession) {
+        setSession(refreshedSession)
+        setUser(refreshedSession.user)
+      }
+    } catch (error) {
+      console.error("Refresh session error:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const value = {
     user,
+    session,
     isLoading,
-    isAuthenticated,
     signIn,
     signOut,
+    refreshSession,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-export const useAuth = () => {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    if (typeof window !== "undefined") {
-      console.warn("useAuth must be used within an AuthProvider")
-    }
-    // Return a default value for SSR
-    return {
-      user: null,
-      isLoading: false,
-      isAuthenticated: false,
-      signIn: async () => ({ error: new Error("AuthProvider not found") }),
-      signOut: async () => {},
-    }
-  }
-  return context
 }

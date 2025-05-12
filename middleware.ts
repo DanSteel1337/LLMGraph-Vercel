@@ -3,38 +3,44 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export async function middleware(req: NextRequest) {
-  // Create a Supabase client configured to use cookies
-  const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req, res })
+  try {
+    // Create a Supabase client configured to use cookies
+    const res = NextResponse.next()
+    const supabase = createMiddlewareClient({ req, res })
 
-  // Refresh session if expired - required for Server Components
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    // Refresh session if expired - required for Server Components
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
 
-  // Get the pathname
-  const path = req.nextUrl.pathname
+    // Get the pathname
+    const path = req.nextUrl.pathname
 
-  // Define public paths that don't require authentication
-  const isPublicPath =
-    path === "/login" || path.startsWith("/api/auth") || path === "/signup" || path === "/reset-password"
+    // Define public paths that don't require authentication
+    const isPublicPath =
+      path === "/login" || path.startsWith("/api/auth") || path === "/signup" || path === "/reset-password"
 
-  // If the path is not public and there's no session, redirect to login
-  if (!isPublicPath && !session) {
-    const redirectUrl = req.nextUrl.clone()
-    redirectUrl.pathname = "/login"
-    redirectUrl.searchParams.set("redirect", path)
-    return NextResponse.redirect(redirectUrl)
+    // If the path is not public and there's no session, redirect to login
+    if (!isPublicPath && !session) {
+      const redirectUrl = req.nextUrl.clone()
+      redirectUrl.pathname = "/login"
+      redirectUrl.searchParams.set("redirect", path)
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    // If the path is login and there's a session, redirect to home
+    if (path === "/login" && session) {
+      const redirectUrl = req.nextUrl.clone()
+      redirectUrl.pathname = "/"
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    return res
+  } catch (error) {
+    console.error("Middleware error:", error)
+    // Return the original response if there's an error
+    return NextResponse.next()
   }
-
-  // If the path is login and there's a session, redirect to home
-  if (path === "/login" && session) {
-    const redirectUrl = req.nextUrl.clone()
-    redirectUrl.pathname = "/"
-    return NextResponse.redirect(redirectUrl)
-  }
-
-  return res
 }
 
 // Configure the middleware to run on specific paths
@@ -45,7 +51,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - api routes that need to be public
      */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/public).*)",
   ],
 }
