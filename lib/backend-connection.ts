@@ -1,4 +1,4 @@
-// Enhance the backend connection utility
+// Backend connection utility
 // This file provides utilities for connecting to the backend
 
 // Check if we have a valid backend URL

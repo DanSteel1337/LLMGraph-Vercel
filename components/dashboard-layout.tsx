@@ -1,234 +1,155 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+
+import { useState } from "react"
 import Link from "next/link"
-import { BarChart3, FileUp, FolderOpen, Search, MessageSquare, Menu, LogOut, User } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { usePathname } from "next/navigation"
+import { BarChart3, FileText, FolderSearch, Home, LogOut, MessageSquare, Settings, Upload, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/lib/auth"
-import { useToast } from "@/components/ui/use-toast"
-import { ErrorBoundary } from "@/components/error-boundary"
 
 interface NavItem {
   title: string
   href: string
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
+  variant: "default" | "ghost"
 }
 
-const navItems: NavItem[] = [
-  {
-    title: "Dashboard",
-    href: "/",
-    icon: BarChart3,
-  },
-  {
-    title: "Upload Documents",
-    href: "/upload",
-    icon: FileUp,
-  },
-  {
-    title: "Manage Documents",
-    href: "/documents",
-    icon: FolderOpen,
-  },
-  {
-    title: "Search",
-    href: "/search",
-    icon: Search,
-  },
-  {
-    title: "Feedback",
-    href: "/feedback",
-    icon: MessageSquare,
-  },
-]
+export function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  const [isOpen, setIsOpen] = useState(false)
+  const { logout } = useAuth()
 
-interface DashboardLayoutProps {
-  children: React.ReactNode
-  pathname: string
-  router: any
-}
-
-export function DashboardLayout({ children, pathname, router }: DashboardLayoutProps) {
-  const [open, setOpen] = useState(false)
-  const { toast } = useToast()
-  const { user, logout, loading } = useAuth()
-  const [mounted, setMounted] = useState(false)
-
-  // Set mounted state after component mounts
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Show loading state while checking authentication
-  if (loading) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Add a check for user authentication
-  if (!user) {
-    // If not authenticated and not loading, redirect to login
-    if (typeof window !== "undefined" && !loading) {
-      router.push("/login")
-    }
-    return null
-  }
-
-  const handleLogout = async () => {
-    try {
-      await logout()
-      toast({
-        title: "Logged out",
-        description: "You have been logged out successfully.",
-      })
-      router.push("/login")
-      router.refresh()
-    } catch (error) {
-      console.error("Logout error:", error)
-      toast({
-        title: "Logout failed",
-        description: "There was an error logging out. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // Only render client-side content after mounting
-  if (!mounted) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-          <p className="text-sm text-muted-foreground">Loading dashboard...</p>
-        </div>
-      </div>
-    )
-  }
+  const navItems: NavItem[] = [
+    {
+      title: "Dashboard",
+      href: "/",
+      icon: Home,
+      variant: pathname === "/" ? "default" : "ghost",
+    },
+    {
+      title: "Documents",
+      href: "/documents",
+      icon: FileText,
+      variant: pathname === "/documents" ? "default" : "ghost",
+    },
+    {
+      title: "Upload",
+      href: "/upload",
+      icon: Upload,
+      variant: pathname === "/upload" ? "default" : "ghost",
+    },
+    {
+      title: "Search",
+      href: "/search",
+      icon: FolderSearch,
+      variant: pathname === "/search" ? "default" : "ghost",
+    },
+    {
+      title: "Feedback",
+      href: "/feedback",
+      icon: MessageSquare,
+      variant: pathname === "/feedback" ? "default" : "ghost",
+    },
+  ]
 
   return (
-    <ErrorBoundary>
-      <div className="flex min-h-screen flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="md:hidden">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle Menu</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-72">
-              <div className="flex flex-col h-full">
-                <div className="px-2 py-4">
-                  <h2 className="text-lg font-semibold">UE Documentation</h2>
-                  <p className="text-sm text-muted-foreground">RAG Dashboard</p>
+    <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-40 border-b bg-background">
+        <div className="container flex h-16 items-center justify-between py-4">
+          <div className="flex items-center gap-2">
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="icon" className="md:hidden">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Toggle Menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72">
+                <div className="px-2 py-6">
+                  <Link href="/" className="flex items-center gap-2 font-semibold" onClick={() => setIsOpen(false)}>
+                    <BarChart3 className="h-6 w-6" />
+                    <span>UE Documentation RAG</span>
+                  </Link>
                 </div>
-                <Separator />
-                <nav className="flex-1 overflow-auto py-4">
-                  {navItems.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setOpen(false)}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                        pathname === item.href
-                          ? "bg-accent text-accent-foreground"
-                          : "hover:bg-accent hover:text-accent-foreground",
-                      )}
-                    >
-                      <item.icon className="h-5 w-5" />
-                      {item.title}
-                    </Link>
-                  ))}
-                </nav>
-                <div className="mt-auto border-t p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      <span className="text-sm font-medium">{user?.name || "Guest"}</span>
-                    </div>
+                <ScrollArea className="h-[calc(100vh-8rem)]">
+                  <div className="flex flex-col gap-2 px-2">
+                    {navItems.map((item) => (
+                      <Link key={item.title} href={item.href} onClick={() => setIsOpen(false)}>
+                        <Button variant={item.variant} className="w-full justify-start">
+                          <item.icon className="mr-2 h-5 w-5" />
+                          {item.title}
+                        </Button>
+                      </Link>
+                    ))}
                   </div>
-                  <Button variant="outline" className="w-full justify-start gap-2" onClick={handleLogout}>
-                    <LogOut className="h-4 w-4" />
+                </ScrollArea>
+                <div className="absolute bottom-4 left-4 right-4">
+                  <Button variant="outline" className="w-full justify-start" onClick={logout}>
+                    <LogOut className="mr-2 h-5 w-5" />
                     Logout
                   </Button>
                 </div>
-              </div>
-            </SheetContent>
-          </Sheet>
-          <div className="flex items-center gap-2">
-            <h1 className="font-semibold text-lg md:text-xl">UE Documentation RAG</h1>
+              </SheetContent>
+            </Sheet>
+            <Link href="/" className="flex items-center gap-2 font-semibold">
+              <BarChart3 className="h-6 w-6" />
+              <span className="hidden md:inline-block">UE Documentation RAG</span>
+            </Link>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <div className="hidden md:flex items-center gap-2">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4" />
-                <span className="text-sm font-medium">{user?.name || "Guest"}</span>
-              </div>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-            <Button variant="outline" size="sm">
-              Help
+          <nav className="hidden gap-2 md:flex">
+            {navItems.map((item) => (
+              <Link key={item.title} href={item.href}>
+                <Button variant={item.variant} size="sm">
+                  <item.icon className="mr-2 h-4 w-4" />
+                  {item.title}
+                </Button>
+              </Link>
+            ))}
+          </nav>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" aria-label="Settings" className="rounded-full" asChild>
+              <Link href="/settings">
+                <Settings className="h-5 w-5" />
+              </Link>
+            </Button>
+            <Button variant="ghost" size="icon" aria-label="Account" className="rounded-full" asChild>
+              <Link href="/account">
+                <User className="h-5 w-5" />
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" className="hidden md:flex" onClick={logout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
             </Button>
           </div>
-        </header>
-        <div className="flex flex-1">
-          <aside className="hidden w-64 shrink-0 border-r md:block">
-            <div className="flex h-full flex-col">
-              <div className="px-4 py-6">
-                <h2 className="text-lg font-semibold">UE Documentation</h2>
-                <p className="text-sm text-muted-foreground">RAG Dashboard</p>
-              </div>
-              <Separator />
-              <nav className="flex-1 overflow-auto py-6 px-2">
-                {navItems.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                      pathname === item.href
-                        ? "bg-accent text-accent-foreground"
-                        : "hover:bg-accent hover:text-accent-foreground",
-                    )}
-                  >
-                    <item.icon className="h-5 w-5" />
-                    {item.title}
-                  </Link>
-                ))}
-              </nav>
-              <div className="mt-auto border-t p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    <span className="text-sm font-medium">{user?.name || "Guest"}</span>
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full justify-start gap-2" onClick={handleLogout}>
-                  <LogOut className="h-4 w-4" />
-                  Logout
-                </Button>
-              </div>
-            </div>
-          </aside>
-          <main className="flex-1 overflow-auto p-4 md:p-6">
-            <ErrorBoundary>{children}</ErrorBoundary>
-          </main>
         </div>
-      </div>
-    </ErrorBoundary>
+      </header>
+      <main className="flex-1">{children}</main>
+    </div>
+  )
+}
+
+function Menu(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="4" x2="20" y1="12" y2="12" />
+      <line x1="4" x2="20" y1="6" y2="6" />
+      <line x1="4" x2="20" y1="18" y2="18" />
+    </svg>
   )
 }

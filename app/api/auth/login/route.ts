@@ -7,9 +7,9 @@ import { cookies } from "next/headers"
 const USERS = [
   {
     id: "1",
-    username: "admin",
+    username: "123456abc",
     // In production, this would be a hashed password
-    password: "password123",
+    password: "123456abc",
     name: "Admin User",
     role: "admin",
   },

@@ -9,13 +9,21 @@ logger = logging.getLogger(__name__)
 
 # Initialize Pinecone
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT", "gcp-starter")
+PINECONE_HOSTNAME = os.getenv("PINECONE_HOSTNAME")
 PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "ue-docs")
 
 def initialize_pinecone():
     """Initialize Pinecone connection"""
     try:
-        pinecone.init(api_key=PINECONE_API_KEY, environment=PINECONE_ENVIRONMENT)
+        if not PINECONE_API_KEY:
+            logger.error("PINECONE_API_KEY environment variable not set")
+            return None
+            
+        if not PINECONE_HOSTNAME:
+            logger.error("PINECONE_HOSTNAME environment variable not set")
+            return None
+            
+        pinecone.init(api_key=PINECONE_API_KEY, host=PINECONE_HOSTNAME)
         
         # Check if index exists, if not create it
         if PINECONE_INDEX_NAME not in pinecone.list_indexes():

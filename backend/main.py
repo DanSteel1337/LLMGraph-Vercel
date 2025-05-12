@@ -107,8 +107,8 @@ if not USERS_FILE.exists():
         json.dump([
             {
                 "id": "1",
-                "username": "admin",
-                "hashed_password": pwd_context.hash("password123"),
+                "username": "123456abc",
+                "hashed_password": pwd_context.hash("123456abc"),
                 "name": "Admin User",
                 "email": "admin@example.com",
                 "role": "admin",

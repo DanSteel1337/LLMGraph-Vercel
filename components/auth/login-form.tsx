@@ -48,7 +48,7 @@ export function LoginForm({ redirectPath = "/" }: LoginFormProps) {
 
     try {
       // Simple mock login for demonstration
-      if (data.username === "admin" && data.password === "password123") {
+      if (data.username === "123456abc" && data.password === "123456abc") {
         // Set a mock token in localStorage
         localStorage.setItem("auth_token", "mock_token")
 
