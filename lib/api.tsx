@@ -2,7 +2,7 @@
 import { shouldUseMockData } from "./backend-connection"
 
 // Base API URL from environment variable
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api"
 
 // Helper function to safely handle dynamic imports
 export function safeDynamicImport<T>(importFn: () => Promise<T>, fallback: T): Promise<T> {
@@ -25,10 +25,20 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
     return getMockData(endpoint, options.method || "GET")
   }
 
-  const url = `${API_URL}${endpoint}`
+  // Determine if this is an internal or external API call
+  const isExternalApi = endpoint.startsWith("http")
+  const url = isExternalApi ? endpoint : `${API_URL}${endpoint}`
+
+  console.log(`Making API request to: ${url}`)
 
   const defaultHeaders = {
     "Content-Type": "application/json",
+  }
+
+  // Add authorization header if we have a token
+  const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
+  if (token) {
+    defaultHeaders["Authorization"] = `Bearer ${token}`
   }
 
   const config = {
@@ -44,19 +54,36 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
 
     // Check if the response is OK (status in the range 200-299)
     if (!response.ok) {
+      const errorText = await response.text().catch(() => "Could not read error response")
       logApiError(
         endpoint,
-        { status: response.status, statusText: response.statusText },
+        { status: response.status, statusText: response.statusText, body: errorText },
         `Request failed with status ${response.status}`,
       )
+      console.log(`Falling back to mock data for ${endpoint} due to error response`)
       return getMockData(endpoint, options.method || "GET")
     }
 
     // Check the content type to ensure we're getting JSON
     const contentType = response.headers.get("content-type")
     if (!contentType || !contentType.includes("application/json")) {
-      logApiError(endpoint, { contentType }, `Expected JSON but got ${contentType || "unknown content type"}`)
-      return getMockData(endpoint, options.method || "GET")
+      // Try to parse as JSON anyway in case the content type is just misconfigured
+      try {
+        const text = await response.text()
+        const data = JSON.parse(text)
+        console.warn(`Received non-JSON content type (${contentType}) but content was valid JSON`)
+        return data
+      } catch (parseError) {
+        // If that fails, log the error and fall back to mock data
+        const text = await response.text().catch(() => "Could not read response body")
+        logApiError(
+          endpoint,
+          { contentType, responseText: text.substring(0, 500) },
+          `Expected JSON but got ${contentType || "unknown content type"}`,
+        )
+        console.log(`Falling back to mock data for ${endpoint} due to content type mismatch`)
+        return getMockData(endpoint, options.method || "GET")
+      }
     }
 
     // Try to parse the response as JSON
@@ -65,14 +92,16 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
       return data
     } catch (parseError) {
       // If JSON parsing fails, log the first 100 characters of the response
-      const text = await response.text()
+      const text = await response.text().catch(() => "Could not read response body")
       logApiError(endpoint, parseError, `Failed to parse JSON response: ${text.substring(0, 100)}...`)
       // Fall back to mock data if JSON parsing fails
+      console.log(`Falling back to mock data for ${endpoint} due to JSON parse error`)
       return getMockData(endpoint, options.method || "GET")
     }
   } catch (error) {
     logApiError(endpoint, error, "Request failed")
     // Return mock data for any request error
+    console.log(`Falling back to mock data for ${endpoint} due to request error`)
     return getMockData(endpoint, options.method || "GET")
   }
 }
@@ -86,6 +115,10 @@ function getMockData(endpoint: string, method: string) {
       totalSearches: 1243,
       totalFeedback: 28,
       vectorCount: 4872,
+      documentChange: 12,
+      searchChange: 24,
+      feedbackChange: 8,
+      vectorChange: 15,
     }
   }
 
@@ -361,47 +394,8 @@ export async function fetchPopularSearches() {
   return apiRequest("/api/searches/popular")
 }
 
-// Update the fetchCategoryDistribution function to always return mock data
 export async function fetchCategoryDistribution() {
-  // Always return mock data for this endpoint to avoid timeout issues
-  console.log("Using mock data for category distribution")
-  return [
-    {
-      name: "Blueprints",
-      count: 42,
-      percentage: 27,
-    },
-    {
-      name: "C++",
-      count: 38,
-      percentage: 24,
-    },
-    {
-      name: "Animation",
-      count: 24,
-      percentage: 15,
-    },
-    {
-      name: "Rendering",
-      count: 18,
-      percentage: 12,
-    },
-    {
-      name: "Physics",
-      count: 14,
-      percentage: 9,
-    },
-    {
-      name: "UI",
-      count: 12,
-      percentage: 8,
-    },
-    {
-      name: "Audio",
-      count: 8,
-      percentage: 5,
-    },
-  ]
+  return apiRequest("/api/categories/distribution")
 }
 
 // Document management API functions

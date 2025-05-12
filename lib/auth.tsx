@@ -5,36 +5,46 @@ import type React from "react"
 import { useState, useEffect, createContext, useContext } from "react"
 import { useRouter } from "next/navigation"
 
+interface User {
+  id: string
+  username: string
+  name: string
+  role: string
+}
+
 interface AuthContextType {
-  user: any | null
+  user: User | null
   loading: boolean
-  login: () => Promise<void>
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
     const loadUserFromCookies = async () => {
       try {
-        // Check for mock token in localStorage
-        const token = localStorage.getItem("auth_token")
+        // Check for user in localStorage (client-side only)
+        if (typeof window !== "undefined") {
+          const userStr = localStorage.getItem("user")
 
-        if (token) {
-          // Mock user data
-          const mockUser = {
-            id: "1",
-            username: "admin",
-            name: "Admin User",
-            role: "admin",
+          if (userStr) {
+            const userData = JSON.parse(userStr)
+            setUser(userData)
+          } else {
+            // Try to fetch user data from the server
+            const response = await fetch("/api/auth/me")
+            if (response.ok) {
+              const userData = await response.json()
+              setUser(userData)
+              localStorage.setItem("user", JSON.stringify(userData))
+            }
           }
-
-          setUser(mockUser)
         }
       } catch (error) {
         console.error("Authentication error:", error)
@@ -44,29 +54,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     loadUserFromCookies()
-  }, [router])
+  }, [])
 
-  const login = async () => {
-    // Mock login function
-    localStorage.setItem("auth_token", "mock_token")
+  const login = async (username: string, password: string) => {
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      })
 
-    // Mock user data
-    const mockUser = {
-      id: "1",
-      username: "admin",
-      name: "Admin User",
-      role: "admin",
+      const data = await response.json()
+
+      if (response.ok && data.user) {
+        setUser(data.user)
+        localStorage.setItem("user", JSON.stringify(data.user))
+        router.refresh()
+        return { success: true }
+      } else {
+        return { success: false, error: data.error || "Login failed" }
+      }
+    } catch (error) {
+      console.error("Login error:", error)
+      return { success: false, error: "An error occurred during login" }
     }
-
-    setUser(mockUser)
-    router.refresh()
   }
 
   const logout = async () => {
-    // Mock logout function
-    localStorage.removeItem("auth_token")
-    setUser(null)
-    router.refresh()
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+      })
+    } catch (error) {
+      console.error("Logout error:", error)
+    } finally {
+      localStorage.removeItem("user")
+      setUser(null)
+      router.push("/login")
+      router.refresh()
+    }
   }
 
   return <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>
@@ -81,7 +109,11 @@ export function useAuth() {
 }
 
 export function isAuthenticated(): boolean {
-  // Check for mock token in localStorage
-  const token = localStorage.getItem("auth_token")
-  return !!token
+  if (typeof window === "undefined") {
+    return false
+  }
+
+  // Check for user in localStorage
+  const userStr = localStorage.getItem("user")
+  return !!userStr
 }

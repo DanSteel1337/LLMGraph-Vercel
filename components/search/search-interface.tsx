@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { SearchResults } from "./search-results"
 import { SearchFilters } from "./search-filters"
 import { performSearch } from "@/lib/api"
+import { useToast } from "@/components/ui/use-toast"
 
 export interface SearchResult {
   id: string
@@ -29,11 +30,21 @@ export function SearchInterface() {
     categories: [] as string[],
     versions: [] as string[],
   })
+  const [hasSearched, setHasSearched] = useState(false)
+  const { toast } = useToast()
 
   const handleSearch = async () => {
-    if (!query.trim()) return
+    if (!query.trim()) {
+      toast({
+        title: "Search query required",
+        description: "Please enter a search term to continue",
+        variant: "destructive",
+      })
+      return
+    }
 
     setIsSearching(true)
+    setHasSearched(true)
 
     try {
       const searchResults = await performSearch({
@@ -43,8 +54,22 @@ export function SearchInterface() {
       })
 
       setResults(searchResults)
+
+      if (searchResults.length === 0) {
+        toast({
+          title: "No results found",
+          description: "Try adjusting your search terms or filters",
+          variant: "default",
+        })
+      }
     } catch (error) {
       console.error("Search failed:", error)
+      toast({
+        title: "Search failed",
+        description: "There was an error processing your search. Please try again.",
+        variant: "destructive",
+      })
+      setResults([])
     } finally {
       setIsSearching(false)
     }
@@ -112,11 +137,7 @@ export function SearchInterface() {
           <SearchFilters filters={filters} onChange={setFilters} onApply={handleSearch} />
         </div>
         <div className="md:col-span-3">
-          <SearchResults
-            results={results}
-            isSearching={isSearching}
-            searchPerformed={results.length > 0 || isSearching}
-          />
+          <SearchResults results={results} isSearching={isSearching} searchPerformed={hasSearched} />
         </div>
       </div>
     </div>

@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, Search, ArrowRight } from "lucide-react"
 import { fetchPopularSearches } from "@/lib/api"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 interface SearchQuery {
   query: string
@@ -116,26 +118,32 @@ export function PopularSearches() {
         </Alert>
 
         {searches.map((search, index) => (
-          <div key={index} className="flex items-center justify-between">
+          <Link
+            key={index}
+            href={`/search?q=${encodeURIComponent(search.query)}`}
+            className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors"
+          >
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">{index + 1}</div>
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                {index + 1}
+              </div>
               <span className="text-sm font-medium">{search.query}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="text-sm text-muted-foreground">{search.count} searches</div>
+              <div className="text-xs text-muted-foreground">{search.count}</div>
               <div
-                className={`text-xs ${
+                className={`text-xs px-1.5 py-0.5 rounded-full ${
                   search.successRate >= 70
-                    ? "text-green-500"
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                     : search.successRate >= 40
-                      ? "text-yellow-500"
-                      : "text-red-500"
+                      ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                      : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
                 }`}
               >
-                {search.successRate}% success
+                {search.successRate}%
               </div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     )
@@ -152,29 +160,44 @@ export function PopularSearches() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {searches.map((search, index) => (
-        <div key={index} className="flex items-center justify-between">
+        <Link
+          key={index}
+          href={`/search?q=${encodeURIComponent(search.query)}`}
+          className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors"
+        >
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">{index + 1}</div>
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+              {index + 1}
+            </div>
             <span className="text-sm font-medium">{search.query}</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="text-sm text-muted-foreground">{search.count} searches</div>
+            <div className="text-xs text-muted-foreground">{search.count}</div>
             <div
-              className={`text-xs ${
+              className={`text-xs px-1.5 py-0.5 rounded-full ${
                 search.successRate >= 70
-                  ? "text-green-500"
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                   : search.successRate >= 40
-                    ? "text-yellow-500"
-                    : "text-red-500"
+                    ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                    : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
               }`}
             >
-              {search.successRate}% success
+              {search.successRate}%
             </div>
           </div>
-        </div>
+        </Link>
       ))}
+      <div className="pt-2">
+        <Button variant="outline" size="sm" asChild className="w-full">
+          <Link href="/search" className="flex items-center justify-center gap-1">
+            <Search className="h-3.5 w-3.5" />
+            <span>Go to Search</span>
+            <ArrowRight className="h-3.5 w-3.5 ml-1" />
+          </Link>
+        </Button>
+      </div>
     </div>
   )
 }

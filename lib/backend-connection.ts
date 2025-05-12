@@ -20,31 +20,39 @@ export const hasPineconeCredentials = () => {
   )
 }
 
+// Check if we have OpenAI credentials
+export const hasOpenAICredentials = () => {
+  return !!process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== "undefined"
+}
+
 // Get connection status
 export const getConnectionStatus = () => {
   const hasBackend = hasBackendUrl()
   const hasPinecone = hasPineconeCredentials()
+  const hasOpenAI = hasOpenAICredentials()
   const useMockDataEnv = process.env.USE_MOCK_DATA === "true"
 
   return {
     hasBackend,
     hasPinecone,
+    hasOpenAI,
     apiUrl: process.env.NEXT_PUBLIC_API_URL || "Not configured",
-    useMockData: !hasBackend || useMockDataEnv,
+    useMockData: !hasBackend || !hasPinecone || !hasOpenAI || useMockDataEnv,
     environment: process.env.NODE_ENV || "development",
   }
 }
 
 // Check if we should use mock data
 export const shouldUseMockData = () => {
-  // Always use mock data in development or preview environments
-  // unless specifically configured not to
-  if (process.env.NODE_ENV === "development" || process.env.VERCEL_ENV === "preview") {
-    // Only use real data if explicitly configured and backend URL is valid
-    if (process.env.USE_MOCK_DATA === "false" && hasBackendUrl()) {
-      return false
-    }
+  // Always use mock data if explicitly configured to do so
+  if (process.env.USE_MOCK_DATA === "true") {
     return true
+  }
+
+  // In development, check if we have all required credentials
+  if (process.env.NODE_ENV === "development") {
+    const status = getConnectionStatus()
+    return !status.hasBackend || !status.hasPinecone || !status.hasOpenAI
   }
 
   // In production, check connection status
@@ -53,19 +61,25 @@ export const shouldUseMockData = () => {
 }
 
 // Test backend connectivity
-export const testBackendConnection = async () => {
+export async function testBackendConnection() {
   if (!hasBackendUrl()) {
     return { connected: false, error: "Backend URL not configured" }
   }
 
   try {
-    const response = await fetch(process.env.NEXT_PUBLIC_API_URL + "/", {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/health`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
+      next: { revalidate: 60 }, // Revalidate every minute
     })
 
     if (response.ok) {
-      return { connected: true }
+      const data = await response.json()
+      return {
+        connected: true,
+        pineconeStatus: data.connections?.pinecone || "unknown",
+        openaiStatus: data.connections?.openai || "unknown",
+      }
     } else {
       return {
         connected: false,

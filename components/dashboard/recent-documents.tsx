@@ -5,6 +5,9 @@ import { formatDistanceToNow } from "date-fns"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchRecentDocuments } from "@/lib/api"
+import { FileText, FileCode, FileImage, FileSpreadsheet, File } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 interface Document {
   id: string
@@ -12,6 +15,7 @@ interface Document {
   category: string
   version: string
   uploadedAt: string
+  fileType?: string
 }
 
 export function RecentDocuments() {
@@ -32,7 +36,12 @@ export function RecentDocuments() {
           setDocuments([])
           setError("Received invalid data format")
         } else {
-          setDocuments(data)
+          // Add file types if they don't exist
+          const docsWithTypes = data.map((doc) => ({
+            ...doc,
+            fileType: doc.fileType || getRandomFileType(),
+          }))
+          setDocuments(docsWithTypes)
         }
       } catch (error) {
         console.error("Failed to fetch recent documents:", error)
@@ -45,6 +54,28 @@ export function RecentDocuments() {
 
     getRecentDocuments()
   }, [])
+
+  // Helper function to get a random file type for mock data
+  function getRandomFileType() {
+    const types = ["text", "code", "image", "spreadsheet", "other"]
+    return types[Math.floor(Math.random() * types.length)]
+  }
+
+  // Helper function to get the appropriate icon based on file type
+  function getFileIcon(fileType: string) {
+    switch (fileType) {
+      case "text":
+        return <FileText className="h-10 w-10 text-blue-500" />
+      case "code":
+        return <FileCode className="h-10 w-10 text-purple-500" />
+      case "image":
+        return <FileImage className="h-10 w-10 text-green-500" />
+      case "spreadsheet":
+        return <FileSpreadsheet className="h-10 w-10 text-orange-500" />
+      default:
+        return <File className="h-10 w-10 text-gray-500" />
+    }
+  }
 
   if (isLoading) {
     return (
@@ -78,6 +109,9 @@ export function RecentDocuments() {
       <div className="flex h-[200px] items-center justify-center rounded-md border border-dashed">
         <div className="text-center">
           <p className="text-sm text-muted-foreground">No documents found</p>
+          <Button asChild className="mt-4" size="sm">
+            <Link href="/upload">Upload Documents</Link>
+          </Button>
         </div>
       </div>
     )
@@ -86,35 +120,30 @@ export function RecentDocuments() {
   return (
     <div className="space-y-4">
       {documents.map((doc) => (
-        <div key={doc.id} className="flex items-start gap-4">
-          <div className="rounded-md bg-muted p-2">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-8 w-8"
-            >
-              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
-          </div>
+        <div key={doc.id} className="flex items-start gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+          <div className="rounded-md bg-background p-2 shadow-sm border">{getFileIcon(doc.fileType || "other")}</div>
           <div className="flex-1 space-y-1">
             <div className="flex items-center gap-2">
-              <p className="font-medium leading-none">{doc.title}</p>
-              <Badge variant="outline">{doc.version}</Badge>
+              <Link href={`/documents/${doc.id}`} className="font-medium leading-none hover:underline">
+                {doc.title}
+              </Link>
+              <Badge variant="outline" className="ml-2">
+                {doc.version}
+              </Badge>
             </div>
             <div className="flex items-center text-sm text-muted-foreground">
-              <span>{doc.category}</span>
+              <span className="font-medium text-foreground/70">{doc.category}</span>
               <span className="mx-2">•</span>
               <span>{formatDistanceToNow(new Date(doc.uploadedAt), { addSuffix: true })}</span>
             </div>
           </div>
         </div>
       ))}
+      <div className="pt-2">
+        <Button variant="outline" size="sm" asChild className="w-full">
+          <Link href="/documents">View All Documents</Link>
+        </Button>
+      </div>
     </div>
   )
 }

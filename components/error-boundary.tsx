@@ -62,7 +62,17 @@ export function ErrorBoundary({ children, fallback }: ErrorBoundaryProps) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  // Clear cache and reload
+                  if ("caches" in window) {
+                    caches.keys().then((names) => {
+                      names.forEach((name) => {
+                        caches.delete(name)
+                      })
+                    })
+                  }
+                  window.location.reload()
+                }}
                 className="flex items-center gap-1"
               >
                 <RefreshCw className="h-3 w-3" /> Refresh page

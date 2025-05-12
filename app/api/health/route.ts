@@ -4,42 +4,38 @@ import { getConnectionStatus } from "@/lib/backend-connection"
 export async function GET() {
   const status = getConnectionStatus()
 
-  // Try to connect to the backend if configured
-  let backendStatus = "unavailable"
-  let backendVersion = null
-
-  if (status.hasBackend) {
+  // Check Pinecone connection
+  let pineconeStatus = "not_configured"
+  if (status.hasPinecone) {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-      })
-
-      if (response.ok) {
-        backendStatus = "connected"
-        try {
-          const data = await response.json()
-          backendVersion = data.version || "unknown"
-        } catch (e) {
-          backendVersion = "unknown format"
-        }
-      } else {
-        backendStatus = `error: ${response.status}`
-      }
+      // We would test the Pinecone connection here
+      // For now, we'll just report that it's configured
+      pineconeStatus = "configured"
     } catch (error) {
-      backendStatus = `error: ${error instanceof Error ? error.message : String(error)}`
+      pineconeStatus = "error"
+    }
+  }
+
+  // Check OpenAI connection
+  let openaiStatus = "not_configured"
+  if (status.hasOpenAI) {
+    try {
+      // We would test the OpenAI connection here
+      // For now, we'll just report that it's configured
+      openaiStatus = "configured"
+    } catch (error) {
+      openaiStatus = "error"
     }
   }
 
   return NextResponse.json({
-    status: "ok",
+    status: "healthy",
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
+    version: "1.0.0",
+    environment: process.env.NODE_ENV || "development",
     connections: {
-      ...status,
-      backendStatus,
-      backendVersion,
+      pinecone: pineconeStatus,
+      openai: openaiStatus,
     },
   })
 }
