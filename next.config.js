@@ -2,16 +2,13 @@
 const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
-  swcMinify: true,
   images: {
     domains: ["images.unsplash.com", "via.placeholder.com"],
   },
   experimental: {
-    // This will allow us to handle the not-found page specially
-    missingSuspenseWithCSRBailout: false,
+    // Remove missingSuspenseWithCSRBailout as it's not recognized in Next.js 15.2.4
   },
-  // Disable static generation for specific paths
-  unstable_excludeFiles: ["**/not-found.tsx", "**/error.tsx", "**/global-error.tsx"],
+  // Remove unstable_excludeFiles as it's not recognized
   webpack: (config, { isServer }) => {
     // Fixes npm packages that depend on `fs` module
     if (!isServer) {
