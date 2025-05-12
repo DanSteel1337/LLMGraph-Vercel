@@ -4,17 +4,19 @@ import { Pinecone } from "@pinecone-database/pinecone"
 import { Document } from "langchain/document"
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter"
 
-// Initialize Pinecone client
+// Initialize Pinecone client with correct parameters
+// The new SDK doesn't use 'environment' parameter
 const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!,
-  environment: process.env.PINECONE_HOSTNAME!.split(".")[0],
+  // Extract the controller host URL from the hostname
+  controllerHostUrl: `https://controller.${process.env.PINECONE_HOSTNAME!.split(".")[0]}.pinecone.io`,
 })
 
-// Initialize OpenAI embeddings with text-embedding-3-large model
+// Initialize OpenAI embeddings
 const embeddings = new OpenAIEmbeddings({
   openAIApiKey: process.env.OPENAI_API_KEY,
-  modelName: "text-embedding-3-large", // Updated to use text-embedding-3-large
-  dimensions: 3072, // text-embedding-3-large uses 3072 dimensions
+  modelName: "text-embedding-3-large",
+  dimensions: 3072,
 })
 
 // Get Pinecone index

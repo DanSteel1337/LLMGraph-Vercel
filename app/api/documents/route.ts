@@ -1,14 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth-options"
 import { processDocument } from "@/lib/ai-sdk"
 import { v4 as uuidv4 } from "uuid"
 import { extractTextFromFile } from "@/lib/document-processor"
+import { createServerClient } from "@/lib/supabase/server"
+import { cookies } from "next/headers"
 
 export async function POST(req: NextRequest) {
   try {
-    // Check authentication
-    const session = await getServerSession(authOptions)
+    // Check authentication using Supabase
+    const cookieStore = cookies()
+    const supabase = createServerClient(cookieStore)
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
     if (!session) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
@@ -33,9 +38,6 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    // In a real app, you'd save this to a file system or blob storage
-    // For this example, we'll extract text directly
-
     // Extract text from file
     const content = await extractTextFromFile(buffer, file.name)
 
@@ -50,7 +52,10 @@ export async function POST(req: NextRequest) {
       category,
       version,
       description,
-      tags,
+      tags: tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
       filename: file.name,
       size: file.size,
       uploadedAt: new Date().toISOString(),
@@ -64,14 +69,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to process document" }, { status: 500 })
     }
 
-    // Save document metadata to database
-    // In a real app, you'd save this to your database
-    // For this example, we'll just return success
+    // Save document metadata to Supabase
+    const { error } = await supabase.from("documents").insert({
+      id: documentId,
+      title,
+      content: content.substring(0, 1000) + (content.length > 1000 ? "..." : ""), // Store preview only
+      category,
+      user_id: session.user.id,
+      metadata: {
+        version,
+        description,
+        tags: tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        filename: file.name,
+        size: file.size,
+      },
+    })
+
+    if (error) {
+      console.error("Error saving document to database:", error)
+      return NextResponse.json({ error: "Failed to save document metadata" }, { status: 500 })
+    }
 
     return NextResponse.json({
       id: documentId,
-      status: "processing",
-      message: "Document uploaded and processing started",
+      status: "success",
+      message: "Document uploaded and processed successfully",
     })
   } catch (error) {
     console.error("Document upload error:", error)

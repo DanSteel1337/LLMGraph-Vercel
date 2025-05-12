@@ -2,9 +2,11 @@ import { Pinecone } from "@pinecone-database/pinecone"
 
 export async function ensurePineconeIndex() {
   try {
+    // Initialize Pinecone client with correct parameters
     const pinecone = new Pinecone({
       apiKey: process.env.PINECONE_API_KEY!,
-      environment: process.env.PINECONE_HOSTNAME!.split(".")[0],
+      // Extract the controller host URL from the hostname
+      controllerHostUrl: `https://controller.${process.env.PINECONE_HOSTNAME!.split(".")[0]}.pinecone.io`,
     })
 
     const indexName = process.env.PINECONE_INDEX_NAME || "ue-docs"
