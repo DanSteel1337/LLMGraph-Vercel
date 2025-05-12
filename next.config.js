@@ -13,7 +13,7 @@ const nextConfig = {
   output: "standalone",
   serverExternalPackages: ["sharp"], // Updated from experimental.serverComponentsExternalPackages
 
-  // Add optimization for chunks
+  // Fix the webpack configuration to avoid null reference errors
   webpack: (config, { isServer }) => {
     // Optimize client-side chunks
     if (!isServer) {
@@ -33,8 +33,15 @@ const nextConfig = {
           lib: {
             test: /[\\/]node_modules[\\/]/,
             name(module) {
-              const packageName = module.context.match(/[\\/]node_modules[\\/](.*?)([\\/]|$)/)[1]
-              return `npm.${packageName.replace("@", "")}`
+              // Fix: Safely extract the package name with null checks
+              const packageNameMatch =
+                module.context && module.context.match
+                  ? module.context.match(/[\\/]node_modules[\\/](.*?)([\\/]|$)/)
+                  : null
+
+              return packageNameMatch && packageNameMatch[1]
+                ? `npm.${packageNameMatch[1].replace("@", "")}`
+                : "npm.unknown"
             },
             priority: 30,
           },
