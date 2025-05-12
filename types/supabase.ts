@@ -9,81 +9,102 @@ export interface Database {
           title: string
           content: string
           category: string
-          user_id: string | null
-          metadata: Json | null
+          user_id: string
           created_at: string
           updated_at: string
+          metadata: Json
         }
         Insert: {
-          id?: string
+          id: string
           title: string
           content: string
           category: string
-          user_id?: string | null
-          metadata?: Json | null
+          user_id: string
           created_at?: string
           updated_at?: string
+          metadata?: Json
         }
         Update: {
           id?: string
           title?: string
           content?: string
           category?: string
-          user_id?: string | null
-          metadata?: Json | null
+          user_id?: string
           created_at?: string
           updated_at?: string
+          metadata?: Json
         }
       }
-      profiles: {
+      feedback: {
         Row: {
           id: string
-          email: string
-          full_name: string | null
-          avatar_url: string | null
-          role: string | null
+          document_id: string
+          content: string
+          correction: string
+          status: string
+          user_id: string
           created_at: string
+          updated_at: string
         }
         Insert: {
           id: string
-          email: string
-          full_name?: string | null
-          avatar_url?: string | null
-          role?: string | null
+          document_id: string
+          content: string
+          correction: string
+          status?: string
+          user_id: string
           created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
-          email?: string
-          full_name?: string | null
-          avatar_url?: string | null
-          role?: string | null
+          document_id?: string
+          content?: string
+          correction?: string
+          status?: string
+          user_id?: string
           created_at?: string
+          updated_at?: string
         }
       }
       search_history: {
         Row: {
           id: string
-          user_id: string
           query: string
+          count: number
           results_count: number
+          user_id: string | null
           created_at: string
+          last_searched_at: string
         }
         Insert: {
           id?: string
-          user_id: string
           query: string
-          results_count: number
+          count?: number
+          results_count?: number
+          user_id?: string | null
           created_at?: string
+          last_searched_at?: string
         }
         Update: {
           id?: string
-          user_id?: string
           query?: string
+          count?: number
           results_count?: number
+          user_id?: string | null
           created_at?: string
+          last_searched_at?: string
         }
       }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
     }
   }
 }

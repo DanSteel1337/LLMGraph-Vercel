@@ -1,13 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
-import { Search, TrendingUp, Loader2 } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { getPopularSearches } from "@/lib/db"
 
-type PopularSearch = {
+interface PopularSearch {
   query: string
   count: number
 }
@@ -18,63 +17,54 @@ export function PopularSearches() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function loadPopularSearches() {
+    const fetchPopularSearches = async () => {
       try {
         setIsLoading(true)
         setError(null)
+
         const data = await getPopularSearches()
         setSearches(data)
-      } catch (err) {
-        console.error("Error loading popular searches:", err)
-        setError("Failed to load popular searches")
+      } catch (error) {
+        console.error("Error fetching popular searches:", error)
+        setError("Failed to fetch popular searches")
       } finally {
         setIsLoading(false)
       }
     }
 
-    loadPopularSearches()
+    fetchPopularSearches()
   }, [])
 
   return (
     <Card>
-      <CardHeader className="pb-2">
+      <CardHeader>
         <CardTitle>Popular Searches</CardTitle>
-        <CardDescription>Most frequently searched terms</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <Skeleton className="h-4 w-[180px]" />
+                <Skeleton className="h-4 w-[50px]" />
+              </div>
+            ))}
           </div>
         ) : error ? (
-          <div className="py-8 text-center">
-            <p className="text-muted-foreground">{error}</p>
-          </div>
+          <div className="text-center py-4 text-sm text-muted-foreground">{error}</div>
         ) : searches.length === 0 ? (
-          <div className="py-8 text-center">
-            <p className="text-muted-foreground">No search data available yet</p>
-            <Button variant="outline" className="mt-4" asChild>
-              <Link href="/search">Try searching</Link>
-            </Button>
-          </div>
+          <div className="text-center py-4 text-sm text-muted-foreground">No search data available</div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-2">
             {searches.map((search, index) => (
-              <div key={index} className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-                  {index < 3 ? (
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                  ) : (
-                    <Search className="h-5 w-5 text-primary" />
-                  )}
+              <div key={index} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                    {index + 1}
+                  </div>
+                  <span className="text-sm truncate max-w-[200px]">{search.query}</span>
                 </div>
-                <div className="flex-1 space-y-1">
-                  <p className="font-medium leading-none">{search.query}</p>
-                  <p className="text-sm text-muted-foreground">{search.count} searches</p>
-                </div>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href={`/search?q=${encodeURIComponent(search.query)}`}>Search</Link>
-                </Button>
+                <Badge variant="secondary">{search.count}</Badge>
               </div>
             ))}
           </div>

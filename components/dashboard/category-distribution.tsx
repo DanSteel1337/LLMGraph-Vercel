@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { getCategoryDistribution } from "@/lib/db"
 
 interface CategoryData {
   name: string
@@ -13,40 +14,35 @@ interface CategoryData {
   color?: string
 }
 
-// Fallback data to use when the API request fails
-const FALLBACK_DATA: CategoryData[] = [
-  { name: "Blueprints", count: 42, percentage: 27, color: "var(--chart-1)" },
-  { name: "C++", count: 38, percentage: 24, color: "var(--chart-2)" },
-  { name: "Animation", count: 24, percentage: 15, color: "var(--chart-3)" },
-  { name: "Rendering", count: 18, percentage: 12, color: "var(--chart-4)" },
-  { name: "Physics", count: 14, percentage: 9, color: "var(--chart-5)" },
-  { name: "UI", count: 12, percentage: 8, color: "hsl(var(--primary))" },
-  { name: "Audio", count: 8, percentage: 5, color: "hsl(var(--secondary))" },
-]
-
 export function CategoryDistribution() {
   const [categories, setCategories] = useState<CategoryData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const getCategoryDistribution = async () => {
+    const fetchCategoryDistribution = async () => {
       try {
         setIsLoading(true)
         setError(null)
 
-        // Always use fallback data to avoid potential issues
-        setCategories(FALLBACK_DATA)
-        setIsLoading(false)
+        const data = await getCategoryDistribution()
+
+        // Assign colors to categories
+        const categoriesWithColors = data.map((category, index) => ({
+          ...category,
+          color: `var(--chart-${(index % 7) + 1}, hsl(${index * 40}, 70%, 50%))`,
+        }))
+
+        setCategories(categoriesWithColors)
       } catch (error) {
         console.error("Error in category distribution component:", error)
-        setCategories(FALLBACK_DATA)
-        setError("An unexpected error occurred - using fallback data")
+        setError("Failed to fetch category distribution")
+      } finally {
         setIsLoading(false)
       }
     }
 
-    getCategoryDistribution()
+    fetchCategoryDistribution()
   }, [])
 
   if (isLoading) {
@@ -57,11 +53,20 @@ export function CategoryDistribution() {
     )
   }
 
+  if (categories.length === 0) {
+    return (
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>No document categories found</AlertDescription>
+      </Alert>
+    )
+  }
+
   return (
     <ErrorBoundary>
       <div className="space-y-6">
         {error && (
-          <Alert variant="warning" className="mb-2">
+          <Alert variant="destructive" className="mb-2">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
@@ -110,10 +115,7 @@ export function CategoryDistribution() {
           {categories.map((category) => (
             <div key={category.name} className="flex flex-col">
               <div className="flex items-center gap-2">
-                <div
-                  className="h-3 w-3 rounded-full"
-                  style={{ backgroundColor: category.color || `hsl(${categories.indexOf(category) * 40}, 70%, 50%)` }}
-                />
+                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: category.color }} />
                 <span className="text-sm font-medium truncate">{category.name}</span>
               </div>
               <div className="flex items-center justify-between mt-1">

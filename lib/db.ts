@@ -1,8 +1,25 @@
 import { supabaseClient } from "@/lib/supabase/client"
 import type { Database } from "@/types/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 // Document types
-export type Document = Database["public"]["Tables"]["documents"]["Row"]
+export type Document = {
+  id: string
+  title: string
+  content: string
+  category: string
+  user_id: string
+  created_at: string
+  updated_at: string
+  metadata: {
+    version: string
+    description: string
+    tags: string[]
+    filename: string
+    size: number
+    chunkCount: number
+  }
+}
 export type DocumentInsert = Database["public"]["Tables"]["documents"]["Insert"]
 export type DocumentUpdate = Database["public"]["Tables"]["documents"]["Update"]
 
@@ -15,26 +32,55 @@ export type SearchHistory = Database["public"]["Tables"]["search_history"]["Row"
 export type SearchHistoryInsert = Database["public"]["Tables"]["search_history"]["Insert"]
 
 // Document functions
-export async function getDocuments() {
-  const { data, error } = await supabaseClient.from("documents").select("*").order("created_at", { ascending: false })
+export async function getDocuments(): Promise<Document[]> {
+  try {
+    const supabase = createClientComponentClient<Database>()
+    const { data, error } = await supabase.from("documents").select("*").order("created_at", { ascending: false })
 
-  if (error) {
+    if (error) {
+      console.error("Error fetching documents:", error)
+      return []
+    }
+
+    return data as unknown as Document[]
+  } catch (error) {
     console.error("Error fetching documents:", error)
-    throw error
+    return []
   }
-
-  return data
 }
 
-export async function getDocumentById(id: string) {
-  const { data, error } = await supabaseClient.from("documents").select("*").eq("id", id).single()
+export async function getDocumentCount(): Promise<number> {
+  try {
+    const supabase = createClientComponentClient<Database>()
+    const { count, error } = await supabase.from("documents").select("*", { count: "exact", head: true })
 
-  if (error) {
-    console.error(`Error fetching document with id ${id}:`, error)
-    throw error
+    if (error) {
+      console.error("Error counting documents:", error)
+      return 0
+    }
+
+    return count || 0
+  } catch (error) {
+    console.error("Error counting documents:", error)
+    return 0
   }
+}
 
-  return data
+export async function getDocumentById(id: string): Promise<Document | null> {
+  try {
+    const supabase = createClientComponentClient<Database>()
+    const { data, error } = await supabase.from("documents").select("*").eq("id", id).single()
+
+    if (error) {
+      console.error("Error fetching document:", error)
+      return null
+    }
+
+    return data as unknown as Document
+  } catch (error) {
+    console.error("Error fetching document:", error)
+    return null
+  }
 }
 
 export async function createDocument(document: DocumentInsert) {
@@ -121,18 +167,126 @@ export async function getSearchHistory(userId: string, limit = 10) {
   return data
 }
 
-export async function getPopularSearches(limit = 5) {
-  const { data, error } = await supabaseClient
-    .from("search_history")
-    .select("query, count(*)")
-    .group("query")
-    .order("count", { ascending: false })
-    .limit(limit)
+export async function getSearchCount(): Promise<number> {
+  try {
+    const supabase = createClientComponentClient<Database>()
+    const { count, error } = await supabase.from("search_history").select("*", { count: "exact", head: true })
 
-  if (error) {
-    console.error("Error fetching popular searches:", error)
-    throw error
+    if (error) {
+      console.error("Error counting searches:", error)
+      return 0
+    }
+
+    return count || 0
+  } catch (error) {
+    console.error("Error counting searches:", error)
+    return 0
   }
+}
 
-  return data
+export async function getPopularSearches(): Promise<{ query: string; count: number }[]> {
+  try {
+    const supabase = createClientComponentClient<Database>()
+    const { data, error } = await supabase
+      .from("search_history")
+      .select("query, count")
+      .order("count", { ascending: false })
+      .limit(5)
+
+    if (error) {
+      console.error("Error fetching popular searches:", error)
+      return []
+    }
+
+    return data as unknown as { query: string; count: number }[]
+  } catch (error) {
+    console.error("Error fetching popular searches:", error)
+    return []
+  }
+}
+
+// Feedback functions
+export async function getFeedbackCount(): Promise<number> {
+  try {
+    const supabase = createClientComponentClient<Database>()
+    const { count, error } = await supabase.from("feedback").select("*", { count: "exact", head: true })
+
+    if (error) {
+      console.error("Error counting feedback:", error)
+      return 0
+    }
+
+    return count || 0
+  } catch (error) {
+    console.error("Error counting feedback:", error)
+    return 0
+  }
+}
+
+// Get category distribution
+export async function getCategoryDistribution(): Promise<{ name: string; count: number; percentage: number }[]> {
+  try {
+    const supabase = createClientComponentClient<Database>()
+    const { data, error } = await supabase.from("documents").select("category")
+
+    if (error) {
+      console.error("Error fetching category distribution:", error)
+      return []
+    }
+
+    const categories = data.map((doc) => doc.category)
+    const categoryCounts: Record<string, number> = {}
+
+    categories.forEach((category) => {
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1
+    })
+
+    const totalDocs = categories.length
+
+    return Object.entries(categoryCounts).map(([name, count]) => ({
+      name,
+      count,
+      percentage: Math.round((count / totalDocs) * 100),
+    }))
+  } catch (error) {
+    console.error("Error fetching category distribution:", error)
+    return []
+  }
+}
+
+// Record search query
+export async function recordSearchQuery(query: string, resultsCount: number): Promise<void> {
+  try {
+    const supabase = createClientComponentClient<Database>()
+
+    // Check if query already exists
+    const { data, error } = await supabase.from("search_history").select("*").eq("query", query).single()
+
+    if (error && error.code !== "PGRST116") {
+      // PGRST116 is the error code for "no rows returned"
+      console.error("Error checking search history:", error)
+      return
+    }
+
+    if (data) {
+      // Update existing query
+      await supabase
+        .from("search_history")
+        .update({
+          count: data.count + 1,
+          last_searched_at: new Date().toISOString(),
+          results_count: resultsCount,
+        })
+        .eq("id", data.id)
+    } else {
+      // Insert new query
+      await supabase.from("search_history").insert({
+        query,
+        count: 1,
+        results_count: resultsCount,
+      })
+    }
+  } catch (error) {
+    console.error("Error recording search query:", error)
+  }
 }

@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ai-sdk/openai": "latest",
     "@hookform/resolvers": "latest",
     "@langchain/anthropic": "latest",
     "@langchain/aws": "latest",
@@ -23,7 +24,6 @@
     "@langchain/mistralai": "latest",
     "@langchain/ollama": "latest",
     "@langchain/openai": "latest",
-    "@langchain/pinecone": "latest",
     "@langchain/xai": "latest",
     "@pinecone-database/pinecone": "latest",
     "@radix-ui/react-accordion": "1.2.2",
@@ -56,6 +56,7 @@
     "@supabase/auth-helpers-nextjs": "latest",
     "@supabase/supabase-js": "latest",
     "@tanstack/react-table": "latest",
+    "ai": "latest",
     "autoprefixer": "^10.4.20",
     "axios": "latest",
     "cheerio": "latest",

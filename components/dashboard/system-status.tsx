@@ -1,142 +1,143 @@
 "use client"
 
-import type React from "react"
-
 import { useEffect, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { CheckCircle, XCircle, AlertCircle, Server, Database, Brain } from "lucide-react"
-import { testBackendConnection } from "@/lib/backend-connection"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { CheckCircle, XCircle, AlertTriangle } from "lucide-react"
+import { checkHealth } from "@/lib/api"
 
-interface ConnectionStatus {
-  connected: boolean
-  pineconeStatus?: string
-  openaiStatus?: string
-  error?: string
+interface SystemStatus {
+  status: "healthy" | "unhealthy" | "degraded"
+  components: {
+    name: string
+    status: "healthy" | "unhealthy" | "degraded"
+    message?: string
+  }[]
+  lastChecked: string
 }
 
 export function SystemStatus() {
-  const [status, setStatus] = useState<ConnectionStatus | null>(null)
+  const [status, setStatus] = useState<SystemStatus | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const checkStatus = async () => {
+    const fetchSystemStatus = async () => {
       try {
         setIsLoading(true)
-        const connectionStatus = await testBackendConnection()
-        setStatus(connectionStatus)
+        setError(null)
+
+        const healthData = await checkHealth()
+
+        // Transform health data into system status
+        const systemStatus: SystemStatus = {
+          status: healthData.status || "unhealthy",
+          components: [
+            {
+              name: "API Server",
+              status: healthData.api?.status || "unhealthy",
+              message: healthData.api?.message,
+            },
+            {
+              name: "Database",
+              status: healthData.database?.status || "unhealthy",
+              message: healthData.database?.message,
+            },
+            {
+              name: "Pinecone",
+              status: healthData.pinecone?.status || "unhealthy",
+              message: healthData.pinecone?.message,
+            },
+            {
+              name: "OpenAI",
+              status: healthData.openai?.status || "unhealthy",
+              message: healthData.openai?.message,
+            },
+          ],
+          lastChecked: new Date().toISOString(),
+        }
+
+        setStatus(systemStatus)
       } catch (error) {
-        console.error("Failed to check connection status:", error)
-        setStatus({
-          connected: false,
-          error: "Failed to check connection status",
-        })
+        console.error("Error fetching system status:", error)
+        setError("Failed to fetch system status")
       } finally {
         setIsLoading(false)
       }
     }
 
-    checkStatus()
+    fetchSystemStatus()
 
-    // Check status every 5 minutes
-    const interval = setInterval(checkStatus, 5 * 60 * 1000)
+    // Refresh status every 5 minutes
+    const interval = setInterval(fetchSystemStatus, 5 * 60 * 1000)
 
     return () => clearInterval(interval)
   }, [])
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Server className="h-5 w-5" />
-          System Status
-        </CardTitle>
-        <CardDescription>Current status of system components</CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">System Status</CardTitle>
+        {!isLoading && !error && status && (
+          <Badge
+            variant={status.status === "healthy" ? "success" : status.status === "degraded" ? "warning" : "destructive"}
+          >
+            {status.status === "healthy"
+              ? "All Systems Operational"
+              : status.status === "degraded"
+                ? "Degraded Performance"
+                : "System Issues Detected"}
+          </Badge>
+        )}
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <div className="space-y-2">
-            <div className="h-6 w-full animate-pulse rounded-md bg-muted"></div>
-            <div className="h-6 w-full animate-pulse rounded-md bg-muted"></div>
-            <div className="h-6 w-full animate-pulse rounded-md bg-muted"></div>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <Skeleton className="h-4 w-[100px]" />
+                <Skeleton className="h-4 w-[80px]" />
+              </div>
+            ))}
           </div>
+        ) : error ? (
+          <div className="text-center py-2 text-sm text-red-500">{error}</div>
         ) : status ? (
-          <div className="space-y-4">
-            <StatusItem
-              title="API Server"
-              status={status.connected ? "online" : "offline"}
-              icon={Server}
-              message={status.connected ? "Connected" : status.error || "Not connected"}
-            />
-            <StatusItem
-              title="Vector Database"
-              status={getPineconeStatus(status.pineconeStatus)}
-              icon={Database}
-              message={getPineconeMessage(status.pineconeStatus)}
-            />
-            <StatusItem
-              title="AI Embeddings"
-              status={getOpenAIStatus(status.openaiStatus)}
-              icon={Brain}
-              message={getOpenAIMessage(status.openaiStatus)}
-            />
+          <div className="space-y-2">
+            {status.components.map((component) => (
+              <div key={component.name} className="flex items-center justify-between">
+                <span className="text-sm">{component.name}</span>
+                <div className="flex items-center gap-1">
+                  {component.status === "healthy" ? (
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                  ) : component.status === "degraded" ? (
+                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-red-500" />
+                  )}
+                  <span
+                    className={`text-xs ${
+                      component.status === "healthy"
+                        ? "text-green-500"
+                        : component.status === "degraded"
+                          ? "text-yellow-500"
+                          : "text-red-500"
+                    }`}
+                  >
+                    {component.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+            <div className="text-xs text-muted-foreground text-right mt-2">
+              Last checked: {new Date(status.lastChecked).toLocaleTimeString()}
+            </div>
           </div>
         ) : (
-          <div className="text-sm text-muted-foreground">Unable to fetch system status</div>
+          <div className="text-center py-2 text-sm text-muted-foreground">No status data available</div>
         )}
       </CardContent>
     </Card>
   )
-}
-
-interface StatusItemProps {
-  title: string
-  status: "online" | "offline" | "warning"
-  icon: React.ElementType
-  message: string
-}
-
-function StatusItem({ title, status, icon: Icon, message }: StatusItemProps) {
-  return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4 text-muted-foreground" />
-        <span className="font-medium">{title}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">{message}</span>
-        {status === "online" && <CheckCircle className="h-5 w-5 text-green-500" />}
-        {status === "offline" && <XCircle className="h-5 w-5 text-red-500" />}
-        {status === "warning" && <AlertCircle className="h-5 w-5 text-yellow-500" />}
-      </div>
-    </div>
-  )
-}
-
-// Helper functions to determine status and messages
-function getPineconeStatus(status?: string): "online" | "offline" | "warning" {
-  if (!status) return "offline"
-  if (status === "configured") return "online"
-  if (status === "error") return "offline"
-  return "warning"
-}
-
-function getPineconeMessage(status?: string): string {
-  if (!status) return "Not configured"
-  if (status === "configured") return "Connected"
-  if (status === "error") return "Connection error"
-  return "Unknown status"
-}
-
-function getOpenAIStatus(status?: string): "online" | "offline" | "warning" {
-  if (!status) return "offline"
-  if (status === "configured") return "online"
-  if (status === "error") return "offline"
-  return "warning"
-}
-
-function getOpenAIMessage(status?: string): string {
-  if (!status) return "Not configured"
-  if (status === "configured") return "Connected"
-  if (status === "error") return "Connection error"
-  return "Unknown status"
 }

@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 interface TrendData {
   date: string
@@ -13,35 +15,34 @@ interface TrendData {
 export function SearchTrends() {
   const [data, setData] = useState<TrendData[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("week")
 
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true)
+    const fetchSearchTrends = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
 
-      // Generate mock data
-      const mockData: TrendData[] = []
-      const now = new Date()
+        // Fetch search trends from API
+        const response = await fetch("/api/search/trends")
 
-      // Generate data for the last 30 days
-      for (let i = 29; i >= 0; i--) {
-        const date = new Date(now)
-        date.setDate(date.getDate() - i)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch search trends: ${response.statusText}`)
+        }
 
-        mockData.push({
-          date: date.toISOString().split("T")[0],
-          searches: Math.floor(Math.random() * 100) + 50,
-          successRate: Math.floor(Math.random() * 30) + 70,
-        })
-      }
-
-      setTimeout(() => {
-        setData(mockData)
+        const trendsData = await response.json()
+        setData(trendsData)
+      } catch (error) {
+        console.error("Error fetching search trends:", error)
+        setError("Failed to fetch search trends")
+        setData([])
+      } finally {
         setIsLoading(false)
-      }, 1000)
+      }
     }
 
-    fetchData()
+    fetchSearchTrends()
   }, [])
 
   const getFilteredData = () => {
@@ -57,17 +58,30 @@ export function SearchTrends() {
   const filteredData = getFilteredData()
   const maxSearches = Math.max(...filteredData.map((d) => d.searches), 100)
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-  }
-
   if (isLoading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-[200px]" />
         <Skeleton className="h-[200px] w-full" />
       </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    )
+  }
+
+  if (data.length === 0) {
+    return (
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>No search trend data available</AlertDescription>
+      </Alert>
     )
   }
 

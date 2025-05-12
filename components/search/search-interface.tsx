@@ -19,11 +19,13 @@ export interface SearchResult {
   version: string
   score: number
   highlights: string[]
+  documentId: string
 }
 
 export function SearchInterface() {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
+  const [answer, setAnswer] = useState<string | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [searchMode, setSearchMode] = useState<"semantic" | "keyword" | "hybrid">("semantic")
   const [filters, setFilters] = useState({
@@ -45,17 +47,22 @@ export function SearchInterface() {
 
     setIsSearching(true)
     setHasSearched(true)
+    setAnswer(null)
 
     try {
-      const searchResults = await performSearch({
+      const searchParams = {
         query,
         mode: searchMode,
         filters,
-      })
+        generateAnswer: true,
+      }
 
-      setResults(searchResults)
+      const searchResponse = await performSearch(searchParams)
 
-      if (searchResults.length === 0) {
+      setResults(searchResponse.results || [])
+      setAnswer(searchResponse.answer || null)
+
+      if (searchResponse.results?.length === 0) {
         toast({
           title: "No results found",
           description: "Try adjusting your search terms or filters",
@@ -137,6 +144,21 @@ export function SearchInterface() {
           <SearchFilters filters={filters} onChange={setFilters} onApply={handleSearch} />
         </div>
         <div className="md:col-span-3">
+          {answer && !isSearching && results.length > 0 && (
+            <Card className="mb-4">
+              <CardHeader>
+                <CardTitle>AI Answer</CardTitle>
+                <CardDescription>Generated from the search results</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="prose prose-sm max-w-none">
+                  {answer.split("\n").map((paragraph, i) => (
+                    <p key={i}>{paragraph}</p>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
           <SearchResults results={results} isSearching={isSearching} searchPerformed={hasSearched} />
         </div>
       </div>
