@@ -1,12 +1,40 @@
 "use client"
 
 import type React from "react"
+
 import { createContext, useContext, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { User, Session } from "@supabase/supabase-js"
-import { getSupabaseClient } from "@/lib/supabase/client"
+import { useToast } from "@/components/ui/use-toast"
 
-type AuthContextType = {
+// Create a default context value
+const defaultAuthValue = {
+  user: null,
+  session: null,
+  isLoading: false,
+  signIn: async () => ({ success: false, error: "Auth not available" }),
+  signOut: async () => {},
+  refreshSession: async () => {},
+}
+
+// Create a context with default values
+const AuthContext = createContext(defaultAuthValue)
+
+// Safe hook that doesn't throw when used outside provider
+export function useAuth() {
+  const context = useContext(AuthContext)
+  // Return default context if not within provider
+  // This prevents errors during static generation
+  if (context === undefined) {
+    console.warn("useAuth was called outside of AuthProvider - using default values")
+    return defaultAuthValue
+  }
+  return context
+}
+
+// Types for the auth context
+export type AuthContextType = {
   user: User | null
   session: Session | null
   isLoading: boolean
@@ -15,174 +43,193 @@ type AuthContextType = {
   refreshSession: () => Promise<void>
 }
 
-// Create a default context value
-const defaultContextValue: AuthContextType = {
-  user: null,
-  session: null,
-  isLoading: true,
-  signIn: async () => ({ success: false, error: "Auth context not initialized" }),
-  signOut: async () => {},
-  refreshSession: async () => {},
-}
-
-const AuthContext = createContext<AuthContextType>(defaultContextValue)
-
-// Track provider mounting without using NODE_ENV
-let isDevEnvironment = false
-try {
-  // This is a safe way to check if we're in development
-  // It will be removed in production builds
-  isDevEnvironment = process.env.NEXT_PUBLIC_VERCEL_ENV !== "production"
-} catch (e) {
-  // Ignore errors
-}
-
-// Create a singleton instance of the AuthProvider to avoid duplicate contexts
-let authProviderMounted = false
+// Check if we're in a browser environment
+const isBrowser = typeof window !== "undefined"
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  const { toast } = useToast()
 
-  // Use the singleton Supabase client
-  const supabase = getSupabaseClient()
-
-  // Warn about duplicate AuthProviders in development
-  useEffect(() => {
-    if (isDevEnvironment) {
-      if (authProviderMounted) {
-        console.warn("Multiple AuthProvider instances detected. This may cause authentication issues.")
-      }
-      authProviderMounted = true
-
-      return () => {
-        authProviderMounted = false
-      }
-    }
-  }, [])
+  // Only create the client in browser environments
+  const supabase = isBrowser ? createClientComponentClient() : null
 
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
+    // Skip if not in browser
+    if (!isBrowser || !supabase) return
+
+    // Check for existing session
+    const checkSession = async () => {
       try {
-        setIsLoading(true)
-
-        // Check for mock token first
-        const mockToken = localStorage.getItem("mock_auth_token")
-        if (mockToken) {
-          console.log("Using mock authentication")
-          // Create a mock user and session
-          const mockUser = {
-            id: "mock-user-id",
-            email: "demo@example.com",
-            user_metadata: {
-              full_name: "Demo User (Mock)",
-            },
-          } as User
-
-          setUser(mockUser)
-          setSession({ user: mockUser } as Session)
-          setIsLoading(false)
-          return
-        }
-
-        // Otherwise use Supabase auth
         const {
-          data: { session },
+          data: { session: activeSession },
         } = await supabase.auth.getSession()
-        setSession(session)
-        setUser(session?.user ?? null)
+
+        if (activeSession) {
+          setSession(activeSession)
+          setUser(activeSession.user)
+        } else {
+          // Check for mock auth
+          const mockToken = localStorage.getItem("mockAuthToken")
+          if (mockToken) {
+            const mockUser = { id: "mock-user-id", email: "demo@example.com", user_metadata: { name: "Demo User" } }
+            setUser(mockUser as User)
+          }
+        }
       } catch (error) {
-        console.error("Error getting initial session:", error)
+        console.error("Error checking session:", error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    getInitialSession()
+    checkSession()
 
-    // Set up auth state change listener
+    // Set up auth state listener
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession)
+      setUser(newSession?.user || null)
       setIsLoading(false)
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase.auth])
+  }, [supabase, isBrowser])
 
   const signIn = async (email: string, password: string) => {
     try {
+      setIsLoading(true)
+
+      // Handle demo login
+      if (email === "demo@example.com" && password === "123456abc") {
+        return handleDemoLogin()
+      }
+
+      if (!supabase) {
+        throw new Error("Supabase client not available")
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
-        return { success: false, error: error.message }
+        throw error
       }
 
+      setUser(data.user)
+      setSession(data.session)
+
       return { success: true }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Sign in error:", error)
-      return { success: false, error: "An unexpected error occurred" }
+      return {
+        success: false,
+        error: error.message || "Failed to sign in. Please check your credentials and try again.",
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDemoLogin = () => {
+    try {
+      // Use mock authentication for demo
+      const mockUser = { id: "mock-user-id", email: "demo@example.com", user_metadata: { name: "Demo User" } }
+
+      // Store mock token in localStorage
+      localStorage.setItem("mockAuthToken", "mock-jwt-token")
+
+      // Update state
+      setUser(mockUser as User)
+
+      toast({
+        title: "Demo mode active",
+        description: "You are now using the application in demo mode.",
+      })
+
+      return { success: true }
+    } catch (error: any) {
+      console.error("Demo login error:", error)
+      return {
+        success: false,
+        error: error.message || "Failed to login with demo account.",
+      }
     }
   }
 
   const signOut = async () => {
-    // Clear mock token if it exists
-    localStorage.removeItem("mock_auth_token")
+    try {
+      setIsLoading(true)
 
-    // Sign out from Supabase
-    await supabase.auth.signOut()
+      // Check for mock auth
+      const mockToken = localStorage.getItem("mockAuthToken")
+      if (mockToken) {
+        localStorage.removeItem("mockAuthToken")
+        setUser(null)
+        setSession(null)
+        return
+      }
 
-    // Redirect to login
-    router.push("/login")
-    router.refresh()
+      if (!supabase) {
+        throw new Error("Supabase client not available")
+      }
+
+      await supabase.auth.signOut()
+      setUser(null)
+      setSession(null)
+      router.push("/login")
+    } catch (error) {
+      console.error("Sign out error:", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const refreshSession = async () => {
     try {
-      // Check for mock token first
-      const mockToken = localStorage.getItem("mock_auth_token")
+      setIsLoading(true)
+
+      // Check for mock auth
+      const mockToken = localStorage.getItem("mockAuthToken")
       if (mockToken) {
-        // No need to refresh mock session
+        // No need to refresh for mock auth
         return
       }
 
-      // Otherwise refresh Supabase session
+      if (!supabase) {
+        throw new Error("Supabase client not available")
+      }
+
       const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      setSession(session)
-      setUser(session?.user ?? null)
+        data: { session: refreshedSession },
+      } = await supabase.auth.refreshSession()
+
+      if (refreshedSession) {
+        setSession(refreshedSession)
+        setUser(refreshedSession.user)
+      }
     } catch (error) {
-      console.error("Error refreshing session:", error)
+      console.error("Refresh session error:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        isLoading,
-        signIn,
-        signOut,
-        refreshSession,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  )
-}
+  const value = {
+    user,
+    session,
+    isLoading,
+    signIn,
+    signOut,
+    refreshSession,
+  }
 
-export const useAuth = () => {
-  return useContext(AuthContext)
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

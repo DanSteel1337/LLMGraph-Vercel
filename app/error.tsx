@@ -1,6 +1,5 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
 export default function Error({
@@ -11,15 +10,23 @@ export default function Error({
   reset: () => void
 }) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
-      <div className="space-y-4 text-center max-w-md">
-        <h2 className="text-2xl font-bold">Something went wrong</h2>
-        <p className="text-muted-foreground">{error.message || "An unexpected error has occurred."}</p>
-        <div className="flex gap-4 justify-center">
-          <Button onClick={() => reset()}>Try again</Button>
-          <Button variant="outline" asChild>
-            <Link href="/">Go home</Link>
-          </Button>
+    <div className="flex flex-col items-center justify-center min-h-[80vh] p-4">
+      <div className="max-w-md text-center space-y-6">
+        <h1 className="text-4xl font-bold">Something went wrong</h1>
+        <p className="text-gray-500">{error.message || "An unexpected error occurred. Please try again later."}</p>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <button
+            onClick={() => reset()}
+            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+          >
+            Try Again
+          </button>
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+          >
+            Return Home
+          </Link>
         </div>
       </div>
     </div>
