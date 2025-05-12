@@ -27,6 +27,16 @@ const defaultContextValue: AuthContextType = {
 
 const AuthContext = createContext<AuthContextType>(defaultContextValue)
 
+// Track provider mounting without using NODE_ENV
+let isDevEnvironment = false
+try {
+  // This is a safe way to check if we're in development
+  // It will be removed in production builds
+  isDevEnvironment = process.env.NEXT_PUBLIC_VERCEL_ENV !== "production"
+} catch (e) {
+  // Ignore errors
+}
+
 // Create a singleton instance of the AuthProvider to avoid duplicate contexts
 let authProviderMounted = false
 
@@ -41,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Warn about duplicate AuthProviders in development
   useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
+    if (isDevEnvironment) {
       if (authProviderMounted) {
         console.warn("Multiple AuthProvider instances detected. This may cause authentication issues.")
       }
@@ -58,6 +68,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const getInitialSession = async () => {
       try {
         setIsLoading(true)
+
+        // Check for mock token first
+        const mockToken = localStorage.getItem("mock_auth_token")
+        if (mockToken) {
+          console.log("Using mock authentication")
+          // Create a mock user and session
+          const mockUser = {
+            id: "mock-user-id",
+            email: "demo@example.com",
+            user_metadata: {
+              full_name: "Demo User (Mock)",
+            },
+          } as User
+
+          setUser(mockUser)
+          setSession({ user: mockUser } as Session)
+          setIsLoading(false)
+          return
+        }
+
+        // Otherwise use Supabase auth
         const {
           data: { session },
         } = await supabase.auth.getSession()
@@ -105,13 +136,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    // Clear mock token if it exists
+    localStorage.removeItem("mock_auth_token")
+
+    // Sign out from Supabase
     await supabase.auth.signOut()
+
+    // Redirect to login
     router.push("/login")
     router.refresh()
   }
 
   const refreshSession = async () => {
     try {
+      // Check for mock token first
+      const mockToken = localStorage.getItem("mock_auth_token")
+      if (mockToken) {
+        // No need to refresh mock session
+        return
+      }
+
+      // Otherwise refresh Supabase session
       const {
         data: { session },
       } = await supabase.auth.getSession()

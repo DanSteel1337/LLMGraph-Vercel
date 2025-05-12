@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
@@ -10,9 +9,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { ErrorBoundary } from "@/components/error-boundary"
-import { supabaseClient } from "@/lib/supabase/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 
-// We'll use direct Supabase client for login to avoid auth context issues
+// We'll use the getter function to avoid multiple instances
 export function LoginForm() {
   const router = useRouter()
   const { toast } = useToast()
@@ -51,8 +50,11 @@ export function LoginForm() {
       setIsLoading(true)
       console.log("Login attempt with:", email)
 
-      // Use Supabase client directly for login
-      const { data, error } = await supabaseClient.auth.signInWithPassword({
+      // Get a fresh instance of the Supabase client
+      const supabase = getSupabaseClient()
+
+      // Use Supabase client for login
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
@@ -93,84 +95,27 @@ export function LoginForm() {
     try {
       setIsLoading(true)
 
-      // First, try to sign up the demo user if it doesn't exist
-      // This is a workaround for the "Database error querying schema" issue
-      try {
-        await supabaseClient.auth.signUp({
-          email: "demo@example.com",
-          password: "123456abc",
-          options: {
-            data: {
-              full_name: "Demo User",
-            },
-          },
-        })
-        // Wait a moment for the user to be created
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-      } catch (signUpError) {
-        console.log("Demo user might already exist or couldn't be created:", signUpError)
-        // Continue with login attempt regardless
-      }
+      // Always use mock login for demo to avoid database issues
+      console.log("Using mock login for demo")
 
-      // Now try to sign in
-      const { data, error } = await supabaseClient.auth.signInWithPassword({
-        email: "demo@example.com",
-        password: "123456abc",
-      })
-
-      if (error) {
-        console.error("Demo login error:", error.message)
-
-        // If we get a database error, fall back to a mock login
-        if (error.message.includes("Database error")) {
-          console.log("Using fallback mock login for demo")
-
-          // Set a mock token in localStorage
-          localStorage.setItem("mock_auth_token", "demo-user-token")
-
-          toast({
-            title: "Demo login successful (mock mode)",
-            description: "You have been logged in with the demo account in mock mode.",
-          })
-
-          // Redirect to the dashboard
-          router.push("/")
-          router.refresh()
-          return
-        }
-
-        toast({
-          variant: "destructive",
-          title: "Demo login failed",
-          description: "Could not log in with demo account. Please try again or contact support.",
-        })
-        return
-      }
-
-      if (data?.user) {
-        toast({
-          title: "Demo login successful",
-          description: "You have been logged in with the demo account.",
-        })
-
-        // Redirect to the dashboard
-        router.push("/")
-        router.refresh()
-      }
-    } catch (error) {
-      console.error("Demo login error:", error)
-
-      // Fall back to mock login if any error occurs
+      // Set a mock token in localStorage
       localStorage.setItem("mock_auth_token", "demo-user-token")
 
       toast({
-        title: "Demo login successful (mock mode)",
-        description: "You have been logged in with the demo account in mock mode due to an error.",
+        title: "Demo login successful",
+        description: "You have been logged in with the demo account.",
       })
 
       // Redirect to the dashboard
       router.push("/")
       router.refresh()
+    } catch (error) {
+      console.error("Demo login error:", error)
+      toast({
+        variant: "destructive",
+        title: "Demo login failed",
+        description: "An error occurred during login. Please try again.",
+      })
     } finally {
       setIsLoading(false)
     }

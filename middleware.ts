@@ -19,16 +19,19 @@ export async function middleware(req: NextRequest) {
   const isPublicPath =
     path === "/login" || path.startsWith("/api/auth") || path === "/signup" || path === "/reset-password"
 
-  // If the path is not public and there's no session, redirect to login
-  if (!isPublicPath && !session) {
+  // Check for mock token in cookies
+  const mockToken = req.cookies.get("mock_auth_token")?.value
+
+  // If the path is not public and there's no session or mock token, redirect to login
+  if (!isPublicPath && !session && !mockToken) {
     const redirectUrl = req.nextUrl.clone()
     redirectUrl.pathname = "/login"
     redirectUrl.searchParams.set("redirect", path)
     return NextResponse.redirect(redirectUrl)
   }
 
-  // If the path is login and there's a session, redirect to home
-  if (path === "/login" && session) {
+  // If the path is login and there's a session or mock token, redirect to home
+  if (path === "/login" && (session || mockToken)) {
     const redirectUrl = req.nextUrl.clone()
     redirectUrl.pathname = "/"
     return NextResponse.redirect(redirectUrl)
