@@ -7,8 +7,18 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { User, Session } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 
+// Types for the auth context
+export type AuthContextType = {
+  user: User | null
+  session: Session | null
+  isLoading: boolean
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  signOut: () => Promise<void>
+  refreshSession: () => Promise<void>
+}
+
 // Create a default context value
-const defaultAuthValue = {
+const defaultAuthValue: AuthContextType = {
   user: null,
   session: null,
   isLoading: true,
@@ -18,27 +28,16 @@ const defaultAuthValue = {
 }
 
 // Create a context with default values
-const AuthContext = createContext(defaultAuthValue)
+const AuthContext = createContext<AuthContextType>(defaultAuthValue)
 
 // Safe hook that doesn't throw when used outside provider
 export const useAuth = () => {
   const context = useContext(AuthContext)
-  // Return default context if not within provider
   if (context === undefined) {
-    console.warn("useAuth was called outside of AuthProvider - using default values")
+    console.error("useAuth must be used within an AuthProvider")
     return defaultAuthValue
   }
   return context
-}
-
-// Types for the auth context
-export type AuthContextType = {
-  user: User | null
-  session: Session | null
-  isLoading: boolean
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  signOut: () => Promise<void>
-  refreshSession: () => Promise<void>
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -51,12 +50,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClientComponentClient<Database>()
 
   useEffect(() => {
+    console.log("AuthProvider mounted, initializing Supabase auth")
+
     // Check for existing session
     const checkSession = async () => {
       try {
+        console.log("Checking for existing session...")
         const {
           data: { session: activeSession },
         } = await supabase.auth.getSession()
+
+        console.log("Session check result:", activeSession ? "Session found" : "No session")
 
         if (activeSession) {
           setSession(activeSession)
@@ -75,18 +79,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      console.log("Auth state changed:", _event, newSession ? "Session exists" : "No session")
       setSession(newSession)
       setUser(newSession?.user || null)
       setIsLoading(false)
     })
 
     return () => {
+      console.log("AuthProvider unmounting, unsubscribing from auth changes")
       subscription.unsubscribe()
     }
   }, [supabase])
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log("Attempting sign in for:", email)
       setIsLoading(true)
 
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -95,9 +102,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
 
       if (error) {
+        console.error("Sign in error:", error)
         throw error
       }
 
+      console.log("Sign in successful:", data.user?.email)
       setUser(data.user)
       setSession(data.session)
 
@@ -115,12 +124,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      console.log("Attempting sign out")
       setIsLoading(true)
 
       await supabase.auth.signOut()
       setUser(null)
       setSession(null)
       router.push("/login")
+      console.log("Sign out successful")
     } catch (error) {
       console.error("Sign out error:", error)
     } finally {
@@ -130,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSession = async () => {
     try {
+      console.log("Attempting to refresh session")
       setIsLoading(true)
 
       const {
@@ -137,8 +149,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } = await supabase.auth.refreshSession()
 
       if (refreshedSession) {
+        console.log("Session refreshed successfully")
         setSession(refreshedSession)
         setUser(refreshedSession.user)
+      } else {
+        console.log("No session to refresh")
       }
     } catch (error) {
       console.error("Refresh session error:", error)
@@ -155,6 +170,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
     refreshSession,
   }
+
+  console.log("AuthProvider rendering with state:", {
+    hasUser: !!user,
+    hasSession: !!session,
+    isLoading,
+  })
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
