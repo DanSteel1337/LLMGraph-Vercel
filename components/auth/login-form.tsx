@@ -9,12 +9,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { ErrorBoundary } from "@/components/error-boundary"
-import { getSupabaseClient } from "@/lib/supabase/client"
+import { useAuth } from "@/lib/auth-context"
 
-// We'll use the getter function to avoid multiple instances
 export function LoginForm() {
   const router = useRouter()
   const { toast } = useToast()
+  const { signIn } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -50,70 +50,31 @@ export function LoginForm() {
       setIsLoading(true)
       console.log("Login attempt with:", email)
 
-      // Get a fresh instance of the Supabase client
-      const supabase = getSupabaseClient()
+      const { success, error } = await signIn(email, password)
 
-      // Use Supabase client for login
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) {
-        console.error("Login error:", error.message)
+      if (!success) {
+        console.error("Login error:", error)
         toast({
           variant: "destructive",
           title: "Login failed",
-          description: error.message || "Invalid email or password. Please try again.",
+          description: error || "Invalid email or password. Please try again.",
         })
         return
       }
 
-      if (data?.user) {
-        toast({
-          title: "Login successful",
-          description: "You have been logged in successfully.",
-        })
+      toast({
+        title: "Login successful",
+        description: "You have been logged in successfully.",
+      })
 
-        // Redirect to the dashboard or requested page
-        router.push(redirect)
-        router.refresh()
-      }
+      // Redirect to the dashboard or requested page
+      router.push(redirect)
+      router.refresh()
     } catch (error) {
       console.error("Login error:", error)
       toast({
         variant: "destructive",
         title: "Login failed",
-        description: "An error occurred during login. Please try again.",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  async function handleDemoLogin() {
-    try {
-      setIsLoading(true)
-
-      // Always use mock login for demo to avoid database issues
-      console.log("Using mock login for demo")
-
-      // Set a mock token in localStorage
-      localStorage.setItem("mock_auth_token", "demo-user-token")
-
-      toast({
-        title: "Demo login successful",
-        description: "You have been logged in with the demo account.",
-      })
-
-      // Redirect to the dashboard
-      router.push("/")
-      router.refresh()
-    } catch (error) {
-      console.error("Demo login error:", error)
-      toast({
-        variant: "destructive",
-        title: "Demo login failed",
         description: "An error occurred during login. Please try again.",
       })
     } finally {
@@ -164,26 +125,6 @@ export function LoginForm() {
             )}
           </Button>
         </form>
-
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">Or</span>
-          </div>
-        </div>
-
-        <Button variant="outline" onClick={handleDemoLogin} disabled={isLoading}>
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Logging in...
-            </>
-          ) : (
-            "Use Demo Account"
-          )}
-        </Button>
 
         <div className="text-center text-sm text-muted-foreground">
           <p>Demo credentials:</p>

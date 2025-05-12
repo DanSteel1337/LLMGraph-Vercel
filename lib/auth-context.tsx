@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { createContext, useContext, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
@@ -70,13 +69,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (activeSession) {
           setSession(activeSession)
           setUser(activeSession.user)
-        } else {
-          // Check for mock auth
-          const mockToken = localStorage.getItem("mockAuthToken")
-          if (mockToken) {
-            const mockUser = { id: "mock-user-id", email: "demo@example.com", user_metadata: { name: "Demo User" } }
-            setUser(mockUser as User)
-          }
         }
       } catch (error) {
         console.error("Error checking session:", error)
@@ -104,11 +96,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true)
-
-      // Handle demo login
-      if (email === "demo@example.com" && password === "123456abc") {
-        return handleDemoLogin()
-      }
 
       if (!supabase) {
         throw new Error("Supabase client not available")
@@ -138,44 +125,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const handleDemoLogin = () => {
-    try {
-      // Use mock authentication for demo
-      const mockUser = { id: "mock-user-id", email: "demo@example.com", user_metadata: { name: "Demo User" } }
-
-      // Store mock token in localStorage
-      localStorage.setItem("mockAuthToken", "mock-jwt-token")
-
-      // Update state
-      setUser(mockUser as User)
-
-      toast({
-        title: "Demo mode active",
-        description: "You are now using the application in demo mode.",
-      })
-
-      return { success: true }
-    } catch (error: any) {
-      console.error("Demo login error:", error)
-      return {
-        success: false,
-        error: error.message || "Failed to login with demo account.",
-      }
-    }
-  }
-
   const signOut = async () => {
     try {
       setIsLoading(true)
-
-      // Check for mock auth
-      const mockToken = localStorage.getItem("mockAuthToken")
-      if (mockToken) {
-        localStorage.removeItem("mockAuthToken")
-        setUser(null)
-        setSession(null)
-        return
-      }
 
       if (!supabase) {
         throw new Error("Supabase client not available")
@@ -195,13 +147,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshSession = async () => {
     try {
       setIsLoading(true)
-
-      // Check for mock auth
-      const mockToken = localStorage.getItem("mockAuthToken")
-      if (mockToken) {
-        // No need to refresh for mock auth
-        return
-      }
 
       if (!supabase) {
         throw new Error("Supabase client not available")

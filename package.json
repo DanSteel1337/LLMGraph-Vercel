@@ -9,7 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@auth/core": "latest",
     "@hookform/resolvers": "latest",
     "@langchain/anthropic": "latest",
     "@langchain/aws": "latest",
@@ -68,13 +67,10 @@
     "fs": "latest",
     "handlebars": "latest",
     "input-otp": "1.4.1",
-    "jose": "latest",
     "langchain": "latest",
     "lucide-react": "^0.454.0",
     "next": "15.2.4",
-    "next-auth": "latest",
     "next-themes": "latest",
-    "nodemailer": "latest",
     "pdfjs-dist": "latest",
     "peggy": "latest",
     "react": "^19",
