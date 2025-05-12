@@ -18,7 +18,12 @@ export async function middleware(req: NextRequest) {
 
     // Define public paths that don't require authentication
     const isPublicPath =
-      path === "/login" || path.startsWith("/api/auth") || path === "/signup" || path === "/reset-password"
+      path === "/login" ||
+      path.startsWith("/api/auth") ||
+      path === "/signup" ||
+      path === "/reset-password" ||
+      path.startsWith("/_next") ||
+      path === "/favicon.ico"
 
     // If the path is not public and there's no session, redirect to login
     if (!isPublicPath && !session) {
@@ -51,8 +56,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - api routes that need to be public
      */
-    "/((?!_next/static|_next/image|favicon.ico|api/public).*)",
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 }

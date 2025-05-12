@@ -1,60 +1,35 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
   reactStrictMode: true,
-  images: {
-    domains: ["images.unsplash.com", "via.placeholder.com"],
+  eslint: {
+    ignoreDuringBuilds: true,
   },
-  experimental: {
-    // Remove missingSuspenseWithCSRBailout as it's not recognized in Next.js 15.2.4
+  typescript: {
+    ignoreBuildErrors: true,
   },
-  // Remove unstable_excludeFiles as it's not recognized
   webpack: (config, { isServer }) => {
-    // Fixes npm packages that depend on `fs` module
-    if (!isServer) {
+    // Handle "self is not defined" error
+    if (isServer) {
+      // When running on the server, some packages might try to access browser-specific globals
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
-        path: false,
-        os: false,
+        net: false,
+        tls: false,
+        crypto: false,
       }
-    }
-
-    // Optimize chunks
-    config.optimization.splitChunks = {
-      chunks: "all",
-      cacheGroups: {
-        default: false,
-        vendors: false,
-        // Vendor chunk
-        vendor: {
-          name: "vendor",
-          // Only include dependencies in node_modules
-          test: /[\\/]node_modules[\\/]/,
-          chunks: "all",
-          priority: 20,
-        },
-        // Common chunk
-        common: {
-          name: "common",
-          minChunks: 2,
-          chunks: "all",
-          priority: 10,
-          reuseExistingChunk: true,
-          enforce: true,
-        },
-      },
     }
 
     return config
   },
-  // Disable TypeScript type checking during build for speed
-  typescript: {
-    ignoreBuildErrors: true,
+  // Disable image optimization during development to avoid potential issues
+  images: {
+    unoptimized: true,
   },
-  eslint: {
-    // Disable ESLint during build for speed
-    ignoreDuringBuilds: true,
+  // Experimental features
+  experimental: {
+    // Enable app directory features
+    appDir: true,
   },
 }
 

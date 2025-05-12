@@ -5,10 +5,7 @@ import { createContext, useContext, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { User, Session } from "@supabase/supabase-js"
-import { useToast } from "@/components/ui/use-toast"
-
-// Check if we're in a browser environment
-const isBrowser = typeof window !== "undefined"
+import type { Database } from "@/types/supabase"
 
 // Create a default context value
 const defaultAuthValue = {
@@ -27,7 +24,6 @@ const AuthContext = createContext(defaultAuthValue)
 export const useAuth = () => {
   const context = useContext(AuthContext)
   // Return default context if not within provider
-  // This prevents errors during static generation
   if (context === undefined) {
     console.warn("useAuth was called outside of AuthProvider - using default values")
     return defaultAuthValue
@@ -50,15 +46,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
-  const { toast } = useToast()
 
-  // Only create the client in browser environments
-  const supabase = isBrowser ? createClientComponentClient() : null
+  // Create the Supabase client directly in the component
+  const supabase = createClientComponentClient<Database>()
 
   useEffect(() => {
-    // Skip if not in browser
-    if (!isBrowser || !supabase) return
-
     // Check for existing session
     const checkSession = async () => {
       try {
@@ -97,10 +89,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true)
 
-      if (!supabase) {
-        throw new Error("Supabase client not available")
-      }
-
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -129,10 +117,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true)
 
-      if (!supabase) {
-        throw new Error("Supabase client not available")
-      }
-
       await supabase.auth.signOut()
       setUser(null)
       setSession(null)
@@ -147,10 +131,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshSession = async () => {
     try {
       setIsLoading(true)
-
-      if (!supabase) {
-        throw new Error("Supabase client not available")
-      }
 
       const {
         data: { session: refreshedSession },
@@ -178,3 +158,5 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
+
+export default AuthProvider

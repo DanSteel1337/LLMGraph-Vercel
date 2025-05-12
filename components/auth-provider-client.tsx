@@ -1,11 +1,18 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { Suspense, type ReactNode } from "react"
 import dynamic from "next/dynamic"
 
-// Dynamically import the AuthProvider with no SSR
-const AuthProviderNoSSR = dynamic(() => import("@/lib/auth").then((mod) => mod.AuthProvider), { ssr: false })
+// Import the AuthProvider with no SSR
+const AuthProvider = dynamic(() => import("@/lib/auth"), {
+  ssr: false,
+  loading: () => <div>Loading auth...</div>,
+})
 
 export function AuthProviderClient({ children }: { children: ReactNode }) {
-  return <AuthProviderNoSSR>{children}</AuthProviderNoSSR>
+  return (
+    <Suspense fallback={<div>Loading auth...</div>}>
+      <AuthProvider>{children}</AuthProvider>
+    </Suspense>
+  )
 }
