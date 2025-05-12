@@ -49,6 +49,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Create the Supabase client directly in the component
   const supabase = createClientComponentClient<Database>()
 
+  // Add a timeout to prevent infinite loading
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (isLoading) {
+        console.log("Auth still loading after timeout, forcing isLoading to false")
+        setIsLoading(false)
+      }
+    }, 5000)
+
+    return () => clearTimeout(timeoutId)
+  }, [isLoading])
+
   useEffect(() => {
     console.log("AuthProvider mounted, initializing Supabase auth")
 
@@ -66,9 +78,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(activeSession)
           setUser(activeSession.user)
         }
+
+        // Always set loading to false after checking session
+        setIsLoading(false)
       } catch (error) {
         console.error("Error checking session:", error)
-      } finally {
         setIsLoading(false)
       }
     }
