@@ -1,53 +1,40 @@
+import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-export function middleware(request: NextRequest) {
-  // Get the pathname of the request
-  const path = request.nextUrl.pathname
+export async function middleware(req: NextRequest) {
+  // Create a Supabase client configured to use cookies
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req, res })
 
-  console.log(`Middleware processing path: ${path}`)
+  // Refresh session if expired - required for Server Components
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  // Get the pathname
+  const path = req.nextUrl.pathname
 
   // Define public paths that don't require authentication
   const isPublicPath =
-    path === "/login" ||
-    path === "/verify-login" ||
-    path.startsWith("/api/auth") ||
-    path.startsWith("/_next") ||
-    path === "/favicon.ico"
+    path === "/login" || path.startsWith("/api/auth") || path === "/signup" || path === "/reset-password"
 
-  console.log(`Is public path: ${isPublicPath}`)
-
-  // Get the token from the cookies
-  const token = request.cookies.get("auth_token")?.value
-
-  console.log(`Auth token exists: ${!!token}`)
-
-  // If the path is not public and there's no token, redirect to login
-  if (!isPublicPath && !token) {
-    console.log(`Redirecting to login from: ${path}`)
-
-    // Create a new URL for the login page
-    const url = request.nextUrl.clone()
-    url.pathname = "/login"
-
-    // Add the original URL as a parameter to redirect after login
-    url.search = `?redirect=${encodeURIComponent(path)}`
-
-    return NextResponse.redirect(url)
+  // If the path is not public and there's no session, redirect to login
+  if (!isPublicPath && !session) {
+    const redirectUrl = req.nextUrl.clone()
+    redirectUrl.pathname = "/login"
+    redirectUrl.searchParams.set("redirect", path)
+    return NextResponse.redirect(redirectUrl)
   }
 
-  // If the path is login and there's a valid token, redirect to home
-  if (path === "/login" && token) {
-    console.log(`Redirecting to home from login with valid token`)
-
-    // Token exists, redirect to home
-    const url = request.nextUrl.clone()
-    url.pathname = "/"
-    return NextResponse.redirect(url)
+  // If the path is login and there's a session, redirect to home
+  if (path === "/login" && session) {
+    const redirectUrl = req.nextUrl.clone()
+    redirectUrl.pathname = "/"
+    return NextResponse.redirect(redirectUrl)
   }
 
-  console.log(`Proceeding with request to: ${path}`)
-  return NextResponse.next()
+  return res
 }
 
 // Configure the middleware to run on specific paths

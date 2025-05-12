@@ -3,7 +3,7 @@ import { Suspense } from "react"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
-import { AuthProvider } from "@/lib/auth"
+import { AuthProvider } from "@/lib/auth-context" // Fixed import path
 import { DashboardLayoutContainer } from "@/components/dashboard-layout-container"
 
 const inter = Inter({ subsets: ["latin"] })

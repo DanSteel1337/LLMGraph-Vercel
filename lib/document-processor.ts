@@ -1,21 +1,30 @@
 // lib/document-processor.ts
 
-import * as pdfjsLib from "pdfjs-dist"
-// @ts-ignore
-import * as pdfjsWorker from "pdfjs-dist/build/pdf.worker.entry"
+import { getDocument } from "pdfjs-dist"
+
+// Configure PDF.js worker
+if (typeof window !== "undefined" && "Worker" in window) {
+  // Client-side only
+  // We don't need to set the worker in server components
+}
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    // @ts-ignore
-    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
+    // Convert buffer to Uint8Array
+    const uint8Array = new Uint8Array(buffer)
 
-    const pdf = await pdfjsLib.getDocument(buffer).promise
+    // Load the PDF document
+    const loadingTask = getDocument({ data: uint8Array })
+    const pdf = await loadingTask.promise
+
     let textContent = ""
 
+    // Extract text from each page
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i)
-      const text = await page.getTextContent()
-      textContent += text.items.map((s: any) => s.str).join(" ") + "\n"
+      const content = await page.getTextContent()
+      const strings = content.items.map((item: any) => item.str)
+      textContent += strings.join(" ") + "\n"
     }
 
     return textContent

@@ -10,22 +10,26 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { supabaseClient } from "@/lib/supabase/client"
 
+// We'll use direct Supabase client for login to avoid auth context issues
 export function LoginForm() {
   const router = useRouter()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [errors, setErrors] = useState<{ username?: string; password?: string }>({})
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
   const searchParams = useSearchParams()
   const redirect = searchParams?.get("redirect") || "/"
 
   const validateForm = () => {
-    const newErrors: { username?: string; password?: string } = {}
+    const newErrors: { email?: string; password?: string } = {}
 
-    if (!username) {
-      newErrors.username = "Username is required"
+    if (!email) {
+      newErrors.email = "Email is required"
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newErrors.email = "Email is invalid"
     }
 
     if (!password) {
@@ -45,39 +49,33 @@ export function LoginForm() {
 
     try {
       setIsLoading(true)
-      console.log("Login attempt with:", username)
+      console.log("Login attempt with:", email)
 
-      // Simple login for demo purposes
-      if (username === "123456abc" && password === "123456abc") {
-        console.log("Login successful, setting token")
+      // Use Supabase client directly for login
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-        // Create a simple token and store it in cookies
-        const token = "demo-token-" + Math.random().toString(36).substring(2, 15)
-        document.cookie = `auth_token=${token}; path=/; max-age=86400`
+      if (error) {
+        console.error("Login error:", error.message)
+        toast({
+          variant: "destructive",
+          title: "Login failed",
+          description: error.message || "Invalid email or password. Please try again.",
+        })
+        return
+      }
 
-        // Also store in localStorage as a backup
-        localStorage.setItem("auth_token", token)
-
+      if (data?.user) {
         toast({
           title: "Login successful",
           description: "You have been logged in successfully.",
         })
 
-        console.log("Redirecting to:", redirect)
-
-        // Redirect to the requested page or dashboard
-        setTimeout(() => {
-          router.push(redirect)
-          router.refresh()
-        }, 100)
-      } else {
-        console.log("Login failed: Invalid credentials")
-
-        toast({
-          variant: "destructive",
-          title: "Login failed",
-          description: "Invalid username or password. Try using 123456abc for both.",
-        })
+        // Redirect to the dashboard or requested page
+        router.push(redirect)
+        router.refresh()
       }
     } catch (error) {
       console.error("Login error:", error)
@@ -91,21 +89,67 @@ export function LoginForm() {
     }
   }
 
+  async function handleDemoLogin() {
+    setEmail("demo@example.com")
+    setPassword("123456abc")
+
+    try {
+      setIsLoading(true)
+
+      // Use Supabase client directly for demo login
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: "demo@example.com",
+        password: "123456abc",
+      })
+
+      if (error) {
+        console.error("Demo login error:", error.message)
+        toast({
+          variant: "destructive",
+          title: "Demo login failed",
+          description: "Could not log in with demo account. Please try again or contact support.",
+        })
+        return
+      }
+
+      if (data?.user) {
+        toast({
+          title: "Demo login successful",
+          description: "You have been logged in with the demo account.",
+        })
+
+        // Redirect to the dashboard
+        router.push("/")
+        router.refresh()
+      }
+    } catch (error) {
+      console.error("Demo login error:", error)
+      toast({
+        variant: "destructive",
+        title: "Demo login failed",
+        description: "An error occurred during login. Please try again.",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <ErrorBoundary>
       <div className="grid gap-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
-              id="username"
-              placeholder="Enter your username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              id="email"
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
-              autoComplete="username"
+              autoComplete="email"
             />
-            {errors.username && <p className="text-sm font-medium text-destructive">{errors.username}</p>}
+            {errors.email && <p className="text-sm font-medium text-destructive">{errors.email}</p>}
           </div>
 
           <div className="space-y-2">
@@ -139,12 +183,24 @@ export function LoginForm() {
             <span className="w-full border-t" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">Demo Credentials</span>
+            <span className="bg-background px-2 text-muted-foreground">Or</span>
           </div>
         </div>
 
+        <Button variant="outline" onClick={handleDemoLogin} disabled={isLoading}>
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Logging in...
+            </>
+          ) : (
+            "Use Demo Account"
+          )}
+        </Button>
+
         <div className="text-center text-sm text-muted-foreground">
-          <p>Username: 123456abc</p>
+          <p>Demo credentials:</p>
+          <p>Email: demo@example.com</p>
           <p>Password: 123456abc</p>
         </div>
       </div>
