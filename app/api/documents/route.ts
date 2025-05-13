@@ -2,8 +2,20 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { processDocument } from "@/lib/ai-sdk"
 
-// Initialize Supabase client
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+// Use edge runtime for better serverless compatibility
+export const runtime = "edge"
+
+// Create a fresh Supabase client for each request
+function getSupabaseClient() {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Missing Supabase environment variables")
+  }
+
+  return createClient(supabaseUrl, supabaseKey)
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,6 +54,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Store document in Supabase
+    const supabase = getSupabaseClient()
     const { data: document, error: documentError } = await supabase
       .from("documents")
       .insert({
@@ -104,6 +117,7 @@ export async function POST(req: NextRequest) {
 export async function GET() {
   try {
     // Fetch documents from Supabase
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase.from("documents").select("*").order("created_at", { ascending: false })
 
     if (error) {

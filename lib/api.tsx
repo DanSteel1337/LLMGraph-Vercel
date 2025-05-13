@@ -1,3 +1,5 @@
+"use client"
+
 // API client for frontend
 import type { SearchResult } from "@/components/search/search-results"
 import type { Document } from "@/components/documents/document-management"

@@ -1,9 +1,41 @@
 import { NextResponse } from "next/server"
 import { getPineconeStats, checkOpenAIHealth } from "@/lib/ai-sdk"
-import { getApiSupabaseClient, withRetry } from "@/lib/supabase/api-client"
-import { checkRequiredEnvVars } from "@/lib/env-check"
+import { createClient } from "@supabase/supabase-js"
 
-export const runtime = "nodejs" // Change from edge to nodejs for better stability
+// Use edge runtime for better serverless compatibility
+export const runtime = "edge"
+
+// Create a fresh Supabase client for each request (no singleton)
+function getSupabaseClient() {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Missing Supabase environment variables")
+  }
+
+  return createClient(supabaseUrl, supabaseKey)
+}
+
+// Check required environment variables
+function checkRequiredEnvVars() {
+  const requiredVars = [
+    { name: "SUPABASE_URL", value: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL },
+    {
+      name: "SUPABASE_SERVICE_ROLE_KEY",
+      value: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    },
+    { name: "PINECONE_API_KEY", value: process.env.PINECONE_API_KEY },
+    { name: "PINECONE_INDEX_NAME", value: process.env.PINECONE_INDEX_NAME },
+    { name: "OPENAI_API_KEY", value: process.env.OPENAI_API_KEY },
+  ]
+
+  const missingVars = requiredVars.filter((v) => !v.value).map((v) => v.name)
+  return {
+    allPresent: missingVars.length === 0,
+    missingVars,
+  }
+}
 
 export async function GET() {
   console.log("Health check API called")
@@ -60,33 +92,25 @@ export async function GET() {
       healthStatus.debug.info.push("All required environment variables are set")
     }
 
-    // Check database connection with retry mechanism
+    // Check database connection
     try {
       console.log("Checking database connection")
-      const supabase = getApiSupabaseClient()
+      const supabase = getSupabaseClient()
 
-      // Use withRetry to handle transient connection issues
-      await withRetry(
-        async () => {
-          const { data, error } = await supabase.from("documents").select("id").limit(1)
+      // Simple query to check connection
+      const { data, error } = await supabase.from("documents").select("id").limit(1)
 
-          if (error) {
-            console.error("Database health check error:", error)
-            throw error
-          }
-
-          return data
-        },
-        3,
-        1000,
-      ) // 3 retries, 1 second delay
+      if (error) {
+        console.error("Database health check error:", error)
+        throw error
+      }
 
       // If we get here, the database connection is healthy
       healthStatus.database.status = "healthy"
       healthStatus.database.message = "Database connection is established and working"
       healthStatus.debug.info.push("Database connection successful")
     } catch (error) {
-      console.error("Database health check failed after retries:", error)
+      console.error("Database health check failed:", error)
       healthStatus.database.status = "unhealthy"
       healthStatus.database.message = `Database connection failed: ${error instanceof Error ? error.message : String(error)}`
       healthStatus.status = "degraded"
@@ -121,7 +145,7 @@ export async function GET() {
       healthStatus.debug.errors.push(`Pinecone error: ${error instanceof Error ? error.message : String(error)}`)
     }
 
-    // Check OpenAI connection with our improved function
+    // Check OpenAI connection
     try {
       console.log("Checking OpenAI connection")
       const openAIHealth = await checkOpenAIHealth()

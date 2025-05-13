@@ -29,13 +29,22 @@ export async function embedWithRetry(text: string, retries = 3, delay = 1000) {
   throw new Error(`Failed to generate embedding after ${retries} attempts: ${lastError?.message || lastError}`)
 }
 
-// Initialize Pinecone client
-const pinecone = new Pinecone({
-  apiKey: process.env.PINECONE_API_KEY!,
-})
+// Create a fresh Pinecone client for each request (no singleton)
+function getPineconeClient() {
+  if (!process.env.PINECONE_API_KEY) {
+    throw new Error("PINECONE_API_KEY is not defined")
+  }
 
-// Get Pinecone index
-const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX_NAME!)
+  const pinecone = new Pinecone({
+    apiKey: process.env.PINECONE_API_KEY,
+  })
+
+  if (!process.env.PINECONE_INDEX_NAME) {
+    throw new Error("PINECONE_INDEX_NAME is not defined")
+  }
+
+  return pinecone.Index(process.env.PINECONE_INDEX_NAME)
+}
 
 // Process a document and store it in Pinecone
 export async function processDocument(
@@ -45,6 +54,9 @@ export async function processDocument(
 ): Promise<boolean> {
   try {
     console.log(`Processing document ${documentId} for Pinecone storage`)
+
+    // Get a fresh Pinecone client
+    const pineconeIndex = getPineconeClient()
 
     // Split text into chunks
     const textSplitter = new RecursiveCharacterTextSplitter({
@@ -89,6 +101,9 @@ export async function processDocument(
 export async function searchSimilarDocuments(query: string, filters?: Record<string, any>, topK = 5): Promise<any[]> {
   try {
     console.log(`Searching for documents similar to: "${query}"`)
+
+    // Get a fresh Pinecone client
+    const pineconeIndex = getPineconeClient()
 
     // Generate embedding for the query
     const embedding = await embedWithRetry(query)
@@ -177,6 +192,9 @@ export async function deleteDocumentVectors(documentId: string): Promise<boolean
   try {
     console.log(`Deleting vectors for document ${documentId}`)
 
+    // Get a fresh Pinecone client
+    const pineconeIndex = getPineconeClient()
+
     // Delete all vectors with matching documentId in metadata
     await pineconeIndex.deleteMany({
       filter: {
@@ -199,6 +217,9 @@ export async function getPineconeStats(): Promise<{
   indexName: string
 }> {
   try {
+    // Get a fresh Pinecone client
+    const pineconeIndex = getPineconeClient()
+
     // Get index stats
     const indexStats = await pineconeIndex.describeIndexStats()
 

@@ -2,12 +2,25 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { deleteDocumentVectors } from "@/lib/ai-sdk"
 
-// Initialize Supabase client
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+// Use edge runtime for better serverless compatibility
+export const runtime = "edge"
+
+// Create a fresh Supabase client for each request
+function getSupabaseClient() {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Missing Supabase environment variables")
+  }
+
+  return createClient(supabaseUrl, supabaseKey)
+}
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id } = params
+    const supabase = getSupabaseClient()
 
     // Delete document from Supabase
     const { error: supabaseError } = await supabase.from("documents").delete().eq("id", id)
@@ -46,6 +59,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   try {
     const { id } = params
     const body = await req.json()
+    const supabase = getSupabaseClient()
 
     // Update document in Supabase
     const { data, error } = await supabase.from("documents").update(body).eq("id", id).select().single()

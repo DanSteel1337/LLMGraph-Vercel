@@ -1,6 +1,39 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { searchSimilarDocuments, generateAnswerFromResults } from "@/lib/ai-sdk"
-import { recordSearchQuery } from "@/lib/db"
+import { createClient } from "@supabase/supabase-js"
+
+// Use edge runtime for better serverless compatibility
+export const runtime = "edge"
+
+// Create a fresh Supabase client for each request
+function getSupabaseClient() {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Missing Supabase environment variables")
+  }
+
+  return createClient(supabaseUrl, supabaseKey)
+}
+
+// Record search query
+async function recordSearchQuery(query: string, resultsCount: number): Promise<void> {
+  try {
+    const supabase = getSupabaseClient()
+
+    // Insert a new record for each search
+    await supabase.from("search_history").insert({
+      query,
+      results_count: resultsCount,
+      // Generate a random UUID for the id
+      id: crypto.randomUUID(),
+      // user_id can be null according to the schema
+    })
+  } catch (error) {
+    console.error("Error recording search query:", error)
+  }
+}
 
 export async function GET(req: NextRequest) {
   try {

@@ -1,6 +1,75 @@
 import { NextResponse } from "next/server"
 import { getPineconeStats } from "@/lib/ai-sdk"
-import { getDocumentCount, getSearchCount, getFeedbackCount } from "@/lib/db"
+import { createClient } from "@supabase/supabase-js"
+
+// Use edge runtime for better serverless compatibility
+export const runtime = "edge"
+
+// Create a fresh Supabase client for each request
+function getSupabaseClient() {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Missing Supabase environment variables")
+  }
+
+  return createClient(supabaseUrl, supabaseKey)
+}
+
+// Get document count
+async function getDocumentCount(): Promise<number> {
+  try {
+    const supabase = getSupabaseClient()
+    const { count, error } = await supabase.from("documents").select("*", { count: "exact", head: true })
+
+    if (error) {
+      console.error("Error counting documents:", error)
+      return 0
+    }
+
+    return count || 0
+  } catch (error) {
+    console.error("Error counting documents:", error)
+    return 0
+  }
+}
+
+// Get search count
+async function getSearchCount(): Promise<number> {
+  try {
+    const supabase = getSupabaseClient()
+    const { count, error } = await supabase.from("search_history").select("*", { count: "exact", head: true })
+
+    if (error) {
+      console.error("Error counting searches:", error)
+      return 0
+    }
+
+    return count || 0
+  } catch (error) {
+    console.error("Error counting searches:", error)
+    return 0
+  }
+}
+
+// Get feedback count
+async function getFeedbackCount(): Promise<number> {
+  try {
+    const supabase = getSupabaseClient()
+    const { count, error } = await supabase.from("feedback").select("*", { count: "exact", head: true })
+
+    if (error) {
+      console.error("Error counting feedback:", error)
+      return 0
+    }
+
+    return count || 0
+  } catch (error) {
+    console.error("Error counting feedback:", error)
+    return 0
+  }
+}
 
 export async function GET() {
   try {
@@ -60,7 +129,7 @@ export async function GET() {
         dimensions: 0,
         indexName: "unknown",
       },
-      { status: 500 },
+      { status: 200 }, // Return 200 even for errors to avoid cascading failures
     )
   }
 }
