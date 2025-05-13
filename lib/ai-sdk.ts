@@ -3,6 +3,32 @@ import { openai } from "@ai-sdk/openai"
 import { Pinecone } from "@pinecone-database/pinecone"
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter"
 
+// Add retry logic for OpenAI operations
+export async function embedWithRetry(text: string, retries = 3, delay = 1000) {
+  let lastError: any
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const { embedding } = await embed({
+        model: openai.embedding("text-embedding-3-small"),
+        value: text,
+      })
+
+      return embedding
+    } catch (error) {
+      console.error(`Embedding attempt ${attempt + 1} failed:`, error)
+      lastError = error
+
+      // Wait before retrying
+      if (attempt < retries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delay * (attempt + 1)))
+      }
+    }
+  }
+
+  throw new Error(`Failed to generate embedding after ${retries} attempts: ${lastError?.message || lastError}`)
+}
+
 // Initialize Pinecone client
 const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!,
@@ -33,10 +59,7 @@ export async function processDocument(
     const vectors = await Promise.all(
       textChunks.map(async (chunk, i) => {
         // Generate embedding for the chunk
-        const { embedding } = await embed({
-          model: openai.embedding("text-embedding-3-small"),
-          value: chunk,
-        })
+        const embedding = await embedWithRetry(chunk)
 
         return {
           id: `${documentId}-chunk-${i}`,
@@ -68,10 +91,7 @@ export async function searchSimilarDocuments(query: string, filters?: Record<str
     console.log(`Searching for documents similar to: "${query}"`)
 
     // Generate embedding for the query
-    const { embedding } = await embed({
-      model: openai.embedding("text-embedding-3-small"),
-      value: query,
-    })
+    const embedding = await embedWithRetry(query)
 
     // Prepare filter if provided
     const filterObj = filters ? { metadata: filters } : undefined
@@ -193,6 +213,20 @@ export async function getPineconeStats(): Promise<{
       vectorCount: 0,
       dimensions: 0,
       indexName: "error",
+    }
+  }
+}
+
+// Update the health check for OpenAI
+export async function checkOpenAIHealth() {
+  try {
+    // Use a very short text for the health check
+    await embedWithRetry("test", 2, 500)
+    return { status: "healthy", message: "OpenAI connection is working" }
+  } catch (error) {
+    return {
+      status: "unhealthy",
+      message: `OpenAI connection failed: ${error instanceof Error ? error.message : String(error)}`,
     }
   }
 }

@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server"
-import { getPineconeStats } from "@/lib/ai-sdk"
+import { getPineconeStats, checkOpenAIHealth } from "@/lib/ai-sdk"
 import { getApiSupabaseClient, withRetry } from "@/lib/supabase/api-client"
-import { embed } from "ai"
-import { openai } from "@ai-sdk/openai"
 
 export async function GET() {
   const healthStatus = {
@@ -68,17 +66,11 @@ export async function GET() {
     healthStatus.status = "degraded"
   }
 
-  // Check OpenAI connection
-  try {
-    // Test embedding generation
-    await embed({
-      model: openai.embedding("text-embedding-3-small"),
-      value: "Test embedding generation",
-    })
-  } catch (error) {
-    console.error("OpenAI health check failed:", error)
-    healthStatus.openai.status = "unhealthy"
-    healthStatus.openai.message = `OpenAI connection failed: ${error instanceof Error ? error.message : String(error)}`
+  // Check OpenAI connection with our improved function
+  const openAIHealth = await checkOpenAIHealth()
+  healthStatus.openai = openAIHealth
+
+  if (openAIHealth.status === "unhealthy") {
     healthStatus.status = "degraded"
   }
 

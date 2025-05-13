@@ -26,10 +26,14 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // Optimize font loading
+  optimizeFonts: true,
   // Experimental features
   experimental: {
     // Enable app directory features
     appDir: true,
+    optimizeCss: true,
+    // Add other experimental features you might have
   },
 }
 

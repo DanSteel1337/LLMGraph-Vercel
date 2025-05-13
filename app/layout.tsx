@@ -4,7 +4,12 @@ import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProviderClient } from "@/components/auth-provider-client"
 
-const inter = Inter({ subsets: ["latin"] })
+// Configure font with display: swap for better performance
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap", // This helps with font loading performance
+  preload: true,
+})
 
 export const metadata = {
   title: "UE RAG Dashboard",
