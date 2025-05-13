@@ -1,21 +1,24 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  swcMinify: true,
   eslint: {
     ignoreDuringBuilds: true,
   },
   typescript: {
     ignoreBuildErrors: true,
   },
+  experimental: {
+    appDir: true,
+    optimizeCss: false,
+    serverComponentsExternalPackages: ["@pinecone-database/pinecone"],
+  },
   webpack: (config, { isServer }) => {
-    // Handle "self is not defined" error
-    if (isServer) {
-      // When running on the server, some packages might try to access browser-specific globals
+    if (!isServer) {
+      // Don't resolve 'fs' module on the client to prevent this error
       config.resolve.fallback = {
-        ...config.resolve.fallback,
         fs: false,
-        net: false,
-        tls: false,
+        path: false,
         crypto: false,
       }
     }
@@ -28,13 +31,6 @@ const nextConfig = {
   },
   // Disable CSS optimization to avoid critters dependency
   optimizeCss: false,
-  // Experimental features
-  experimental: {
-    // Enable app directory features
-    appDir: true,
-    // Disable CSS optimization that requires critters
-    optimizeCss: false,
-  },
 }
 
 module.exports = nextConfig

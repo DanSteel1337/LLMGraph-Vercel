@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
 // Use edge runtime for better serverless compatibility
-export const runtime = "edge"
+export const runtime = "nodejs"
 
 // Create a fresh Supabase client for each request
 function getSupabaseClient() {
