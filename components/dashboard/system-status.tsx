@@ -31,6 +31,7 @@ export function SystemStatus() {
   const [error, setError] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showDebug, setShowDebug] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
 
   const fetchSystemStatus = async () => {
     try {
@@ -69,7 +70,7 @@ export function SystemStatus() {
           errors: healthData.debug?.errors || [],
           warnings: healthData.debug?.warnings || [],
           info: healthData.debug?.info || [],
-          clientError: healthData.debug?.clientError,
+          clientError: healthData.debug?.clientError || healthData.error,
         },
       }
 
@@ -105,7 +106,7 @@ export function SystemStatus() {
     const interval = setInterval(fetchSystemStatus, 5 * 60 * 1000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [retryCount])
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
@@ -144,6 +145,10 @@ export function SystemStatus() {
       default:
         return <AlertTriangle className="h-4 w-4 text-gray-500" />
     }
+  }
+
+  const handleRetry = () => {
+    setRetryCount((prev) => prev + 1)
   }
 
   return (
@@ -268,7 +273,7 @@ export function SystemStatus() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={fetchSystemStatus}
+                    onClick={handleRetry}
                     disabled={isRefreshing}
                     className="h-7 px-2"
                   >

@@ -2,8 +2,8 @@ import { NextResponse } from "next/server"
 import { getPineconeStats, checkOpenAIHealth } from "@/lib/ai-sdk"
 import { createClient } from "@supabase/supabase-js"
 
-// Use edge runtime for better serverless compatibility
-export const runtime = "nodejs"
+// Revert to edge runtime which was working before
+export const runtime = "edge"
 
 // Create a fresh Supabase client for each request (no singleton)
 function getSupabaseClient() {
@@ -11,7 +11,8 @@ function getSupabaseClient() {
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Missing Supabase environment variables")
+    console.error("Missing Supabase environment variables")
+    return null
   }
 
   return createClient(supabaseUrl, supabaseKey)
@@ -42,22 +43,22 @@ export async function GET() {
 
   // Initialize health status with default values
   const healthStatus = {
-    status: "healthy",
+    status: "degraded", // Start with degraded and upgrade to healthy if all checks pass
     api: {
       status: "healthy",
       message: "API is operational",
     },
     database: {
-      status: "healthy",
-      message: "Database connection is established",
+      status: "unknown",
+      message: "Database status not checked yet",
     },
     pinecone: {
-      status: "healthy",
-      message: "Pinecone connection is established",
+      status: "unknown",
+      message: "Pinecone status not checked yet",
     },
     openai: {
-      status: "healthy",
-      message: "OpenAI connection is established",
+      status: "unknown",
+      message: "OpenAI status not checked yet",
     },
     timestamp: new Date().toISOString(),
     debug: {
@@ -97,8 +98,16 @@ export async function GET() {
       console.log("Checking database connection")
       const supabase = getSupabaseClient()
 
-      // Simple query to check connection
+      if (!supabase) {
+        throw new Error("Failed to initialize Supabase client")
+      }
+
+      // Simple query to check connection with timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 second timeout
+
       const { data, error } = await supabase.from("documents").select("id").limit(1)
+      clearTimeout(timeoutId)
 
       if (error) {
         console.error("Database health check error:", error)
@@ -113,26 +122,32 @@ export async function GET() {
       console.error("Database health check failed:", error)
       healthStatus.database.status = "unhealthy"
       healthStatus.database.message = `Database connection failed: ${error instanceof Error ? error.message : String(error)}`
-      healthStatus.status = "degraded"
       healthStatus.debug.errors.push(`Database error: ${error instanceof Error ? error.message : String(error)}`)
     }
 
-    // Check Pinecone connection
+    // Check Pinecone connection with timeout
     try {
       console.log("Checking Pinecone connection")
-      const pineconeStats = await getPineconeStats()
+
+      // Add timeout for Pinecone check
+      const pineconePromise = getPineconeStats()
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Pinecone check timed out after 3 seconds")), 3000),
+      )
+
+      const pineconeStats = (await Promise.race([pineconePromise, timeoutPromise])) as any
 
       if (!pineconeStats) {
         healthStatus.pinecone.status = "unhealthy"
         healthStatus.pinecone.message = "Failed to get Pinecone stats"
-        healthStatus.status = "degraded"
         healthStatus.debug.errors.push("Pinecone stats returned null or undefined")
       } else if (pineconeStats.vectorCount === 0 && pineconeStats.dimensions === 0) {
         healthStatus.pinecone.status = "degraded"
         healthStatus.pinecone.message = "Pinecone connection established but no vectors found"
-        healthStatus.status = "degraded"
         healthStatus.debug.warnings.push("Pinecone has no vectors")
       } else {
+        healthStatus.pinecone.status = "healthy"
+        healthStatus.pinecone.message = "Pinecone connection established"
         healthStatus.debug.info.push(
           `Pinecone stats: ${pineconeStats.vectorCount} vectors, ${pineconeStats.dimensions} dimensions`,
         )
@@ -141,18 +156,24 @@ export async function GET() {
       console.error("Pinecone health check failed:", error)
       healthStatus.pinecone.status = "unhealthy"
       healthStatus.pinecone.message = `Pinecone connection failed: ${error instanceof Error ? error.message : String(error)}`
-      healthStatus.status = "degraded"
       healthStatus.debug.errors.push(`Pinecone error: ${error instanceof Error ? error.message : String(error)}`)
     }
 
-    // Check OpenAI connection
+    // Check OpenAI connection with timeout
     try {
       console.log("Checking OpenAI connection")
-      const openAIHealth = await checkOpenAIHealth()
+
+      // Add timeout for OpenAI check
+      const openAIPromise = checkOpenAIHealth()
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("OpenAI check timed out after 3 seconds")), 3000),
+      )
+
+      const openAIHealth = (await Promise.race([openAIPromise, timeoutPromise])) as any
+
       healthStatus.openai = openAIHealth
 
       if (openAIHealth.status === "unhealthy") {
-        healthStatus.status = "degraded"
         healthStatus.debug.errors.push(`OpenAI error: ${openAIHealth.message}`)
       } else {
         healthStatus.debug.info.push("OpenAI connection successful")
@@ -161,17 +182,24 @@ export async function GET() {
       console.error("OpenAI health check failed:", error)
       healthStatus.openai.status = "unhealthy"
       healthStatus.openai.message = `OpenAI connection failed: ${error instanceof Error ? error.message : String(error)}`
-      healthStatus.status = "degraded"
       healthStatus.debug.errors.push(`OpenAI error: ${error instanceof Error ? error.message : String(error)}`)
     }
 
-    // If any component is unhealthy, mark the overall status as unhealthy
+    // Determine overall status
     if (
+      healthStatus.database.status === "healthy" &&
+      healthStatus.pinecone.status === "healthy" &&
+      healthStatus.openai.status === "healthy"
+    ) {
+      healthStatus.status = "healthy"
+    } else if (
       healthStatus.database.status === "unhealthy" ||
       healthStatus.pinecone.status === "unhealthy" ||
       healthStatus.openai.status === "unhealthy"
     ) {
       healthStatus.status = "unhealthy"
+    } else {
+      healthStatus.status = "degraded"
     }
 
     console.log("Health check completed with status:", healthStatus.status)

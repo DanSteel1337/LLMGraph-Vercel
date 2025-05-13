@@ -232,7 +232,7 @@ export async function checkHealth(): Promise<any> {
     // Add cache-busting parameter and timeout
     const timestamp = new Date().getTime()
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout (increased from 5)
+    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout (reduced from 10)
 
     const response = await fetch(`/api/health?_=${timestamp}`, {
       headers: {
@@ -269,7 +269,7 @@ export async function checkHealth(): Promise<any> {
   } catch (error) {
     // Provide detailed error logging
     if (error.name === "AbortError") {
-      console.error("Health check timed out after 10 seconds")
+      console.error("Health check timed out after 5 seconds")
     } else {
       console.error("Error checking health:", error)
     }

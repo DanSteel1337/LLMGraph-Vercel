@@ -1,7 +1,6 @@
 import { embed, generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
 import { Pinecone } from "@pinecone-database/pinecone"
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitter"
 
 // Add retry logic for OpenAI operations
 export async function embedWithRetry(text: string, retries = 3, delay = 1000) {
@@ -35,15 +34,20 @@ function getPineconeClient() {
     throw new Error("PINECONE_API_KEY is not defined")
   }
 
-  const pinecone = new Pinecone({
-    apiKey: process.env.PINECONE_API_KEY,
-  })
-
   if (!process.env.PINECONE_INDEX_NAME) {
     throw new Error("PINECONE_INDEX_NAME is not defined")
   }
 
-  return pinecone.Index(process.env.PINECONE_INDEX_NAME)
+  try {
+    const pinecone = new Pinecone({
+      apiKey: process.env.PINECONE_API_KEY,
+    })
+
+    return pinecone.Index(process.env.PINECONE_INDEX_NAME)
+  } catch (error) {
+    console.error("Error initializing Pinecone client:", error)
+    throw error
+  }
 }
 
 // Process a document and store it in Pinecone
@@ -58,13 +62,18 @@ export async function processDocument(
     // Get a fresh Pinecone client
     const pineconeIndex = getPineconeClient()
 
-    // Split text into chunks
-    const textSplitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 1000,
-      chunkOverlap: 200,
-    })
+    // Split text into chunks (simplified for edge compatibility)
+    const chunkSize = 1000
+    const overlap = 200
+    const textChunks = []
 
-    const textChunks = await textSplitter.splitText(content)
+    for (let i = 0; i < content.length; i += chunkSize - overlap) {
+      const chunk = content.substring(i, i + chunkSize)
+      if (chunk.length > 0) {
+        textChunks.push(chunk)
+      }
+    }
+
     console.log(`Split document into ${textChunks.length} chunks`)
 
     // Process each chunk
