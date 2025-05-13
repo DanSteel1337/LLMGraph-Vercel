@@ -187,15 +187,30 @@ export async function getSearchCount(): Promise<number> {
 export async function getPopularSearches(): Promise<{ query: string; count: number }[]> {
   try {
     const supabase = createClientComponentClient<Database>()
-    const { data, error } = await supabase
-      .from("search_history")
-      .select("query, count")
-      .order("count", { ascending: false })
-      .limit(5)
+
+    // Use a proper aggregation query with GROUP BY
+    const { data, error } = await supabase.rpc("get_popular_searches", { limit_count: 5 })
 
     if (error) {
       console.error("Error fetching popular searches:", error)
-      return []
+
+      // Fallback to a simpler query if the RPC function doesn't exist
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from("search_history")
+        .select("query")
+        .order("count", { ascending: false })
+        .limit(5)
+
+      if (fallbackError) {
+        console.error("Error in fallback query:", fallbackError)
+        return []
+      }
+
+      // Convert the fallback data to the expected format
+      return fallbackData.map((item) => ({
+        query: item.query,
+        count: 1, // We don't have the actual count in this fallback
+      }))
     }
 
     return data as unknown as { query: string; count: number }[]
