@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getPineconeStats } from "@/lib/ai-sdk"
-import { supabaseClient } from "@/lib/supabase/client"
+import { getApiSupabaseClient, withRetry } from "@/lib/supabase/api-client"
 import { embed } from "ai"
 import { openai } from "@ai-sdk/openai"
 
@@ -26,16 +26,27 @@ export async function GET() {
     timestamp: new Date().toISOString(),
   }
 
-  // Check database connection
+  // Check database connection with retry mechanism
   try {
-    const { data, error } = await supabaseClient.from("documents").select("id").limit(1)
+    const supabase = getApiSupabaseClient()
 
-    if (error) {
-      healthStatus.database.status = "unhealthy"
-      healthStatus.database.message = `Database error: ${error.message}`
-      healthStatus.status = "degraded"
-    }
+    // Use withRetry to handle transient connection issues
+    await withRetry(async () => {
+      const { data, error } = await supabase.from("documents").select("id").limit(1)
+
+      if (error) {
+        console.error("Database health check error:", error)
+        throw error
+      }
+
+      return data
+    })
+
+    // If we get here, the database connection is healthy
+    healthStatus.database.status = "healthy"
+    healthStatus.database.message = "Database connection is established and working"
   } catch (error) {
+    console.error("Database health check failed after retries:", error)
     healthStatus.database.status = "unhealthy"
     healthStatus.database.message = `Database connection failed: ${error instanceof Error ? error.message : String(error)}`
     healthStatus.status = "degraded"
@@ -51,6 +62,7 @@ export async function GET() {
       healthStatus.status = "degraded"
     }
   } catch (error) {
+    console.error("Pinecone health check failed:", error)
     healthStatus.pinecone.status = "unhealthy"
     healthStatus.pinecone.message = `Pinecone connection failed: ${error instanceof Error ? error.message : String(error)}`
     healthStatus.status = "degraded"
@@ -64,6 +76,7 @@ export async function GET() {
       value: "Test embedding generation",
     })
   } catch (error) {
+    console.error("OpenAI health check failed:", error)
     healthStatus.openai.status = "unhealthy"
     healthStatus.openai.message = `OpenAI connection failed: ${error instanceof Error ? error.message : String(error)}`
     healthStatus.status = "degraded"

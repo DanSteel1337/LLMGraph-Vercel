@@ -1,6 +1,8 @@
 import { supabaseClient } from "@/lib/supabase/client"
+import { getApiSupabaseClient, withRetry } from "@/lib/supabase/api-client"
 import type { Database } from "@/types/supabase"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { isServer } from "@/lib/utils"
 
 // Document types
 export type Document = {
@@ -30,6 +32,14 @@ export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"]
 // Search history types
 export type SearchHistory = Database["public"]["Tables"]["search_history"]["Row"]
 export type SearchHistoryInsert = Database["public"]["Tables"]["search_history"]["Insert"]
+
+// Get the appropriate Supabase client based on the execution context
+function getSupabase() {
+  if (isServer()) {
+    return getApiSupabaseClient()
+  }
+  return supabaseClient
+}
 
 // Document functions
 export async function getDocuments(): Promise<Document[]> {
@@ -84,87 +94,150 @@ export async function getDocumentById(id: string): Promise<Document | null> {
 }
 
 export async function createDocument(document: DocumentInsert) {
-  const { data, error } = await supabaseClient.from("documents").insert(document).select().single()
+  const supabase = getSupabase()
 
-  if (error) {
-    console.error("Error creating document:", error)
+  try {
+    const { data, error } = await withRetry(async () => {
+      return await supabase.from("documents").insert(document).select().single()
+    })
+
+    if (error) {
+      console.error("Error creating document:", error)
+      throw error
+    }
+
+    return data
+  } catch (error) {
+    console.error("Error creating document after retries:", error)
     throw error
   }
-
-  return data
 }
 
 export async function updateDocument(id: string, document: DocumentUpdate) {
-  const { data, error } = await supabaseClient.from("documents").update(document).eq("id", id).select().single()
+  const supabase = getSupabase()
 
-  if (error) {
-    console.error(`Error updating document with id ${id}:`, error)
+  try {
+    const { data, error } = await withRetry(async () => {
+      return await supabase.from("documents").update(document).eq("id", id).select().single()
+    })
+
+    if (error) {
+      console.error(`Error updating document with id ${id}:`, error)
+      throw error
+    }
+
+    return data
+  } catch (error) {
+    console.error(`Error updating document with id ${id} after retries:`, error)
     throw error
   }
-
-  return data
 }
 
 export async function deleteDocument(id: string) {
-  const { error } = await supabaseClient.from("documents").delete().eq("id", id)
+  const supabase = getSupabase()
 
-  if (error) {
-    console.error(`Error deleting document with id ${id}:`, error)
+  try {
+    const { error } = await withRetry(async () => {
+      return await supabase.from("documents").delete().eq("id", id)
+    })
+
+    if (error) {
+      console.error(`Error deleting document with id ${id}:`, error)
+      throw error
+    }
+
+    return true
+  } catch (error) {
+    console.error(`Error deleting document with id ${id} after retries:`, error)
     throw error
   }
-
-  return true
 }
 
 // Profile functions
 export async function getProfile(userId: string) {
-  const { data, error } = await supabaseClient.from("profiles").select("*").eq("id", userId).single()
+  const supabase = getSupabase()
 
-  if (error) {
-    console.error(`Error fetching profile for user ${userId}:`, error)
+  try {
+    const { data, error } = await withRetry(async () => {
+      return await supabase.from("profiles").select("*").eq("id", userId).single()
+    })
+
+    if (error) {
+      console.error(`Error fetching profile for user ${userId}:`, error)
+      throw error
+    }
+
+    return data
+  } catch (error) {
+    console.error(`Error fetching profile for user ${userId} after retries:`, error)
     throw error
   }
-
-  return data
 }
 
 export async function updateProfile(userId: string, profile: ProfileUpdate) {
-  const { data, error } = await supabaseClient.from("profiles").update(profile).eq("id", userId).select().single()
+  const supabase = getSupabase()
 
-  if (error) {
-    console.error(`Error updating profile for user ${userId}:`, error)
+  try {
+    const { data, error } = await withRetry(async () => {
+      return await supabase.from("profiles").update(profile).eq("id", userId).select().single()
+    })
+
+    if (error) {
+      console.error(`Error updating profile for user ${userId}:`, error)
+      throw error
+    }
+
+    return data
+  } catch (error) {
+    console.error(`Error updating profile for user ${userId} after retries:`, error)
     throw error
   }
-
-  return data
 }
 
 // Search history functions
 export async function addSearchHistory(searchHistory: SearchHistoryInsert) {
-  const { data, error } = await supabaseClient.from("search_history").insert(searchHistory).select().single()
+  const supabase = getSupabase()
 
-  if (error) {
-    console.error("Error adding search history:", error)
+  try {
+    const { data, error } = await withRetry(async () => {
+      return await supabase.from("search_history").insert(searchHistory).select().single()
+    })
+
+    if (error) {
+      console.error("Error adding search history:", error)
+      throw error
+    }
+
+    return data
+  } catch (error) {
+    console.error("Error adding search history after retries:", error)
     throw error
   }
-
-  return data
 }
 
 export async function getSearchHistory(userId: string, limit = 10) {
-  const { data, error } = await supabaseClient
-    .from("search_history")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(limit)
+  const supabase = getSupabase()
 
-  if (error) {
-    console.error(`Error fetching search history for user ${userId}:`, error)
+  try {
+    const { data, error } = await withRetry(async () => {
+      return await supabase
+        .from("search_history")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(limit)
+    })
+
+    if (error) {
+      console.error(`Error fetching search history for user ${userId}:`, error)
+      throw error
+    }
+
+    return data
+  } catch (error) {
+    console.error(`Error fetching search history for user ${userId} after retries:`, error)
     throw error
   }
-
-  return data
 }
 
 export async function getSearchCount(): Promise<number> {
