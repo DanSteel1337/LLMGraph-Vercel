@@ -26,14 +26,14 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Optimize font loading
-  optimizeFonts: true,
+  // Disable CSS optimization to avoid critters dependency
+  optimizeCss: false,
   // Experimental features
   experimental: {
     // Enable app directory features
     appDir: true,
-    optimizeCss: true,
-    // Add other experimental features you might have
+    // Disable CSS optimization that requires critters
+    optimizeCss: false,
   },
 }
 

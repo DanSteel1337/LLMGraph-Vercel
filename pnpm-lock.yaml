@@ -140,6 +140,12 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: 1.1.6
         version: 1.1.6(@types/react-dom@19.0.0)(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      '@stripe/react-stripe-js':
+        specifier: latest
+        version: 3.7.0(@stripe/stripe-js@7.3.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      '@stripe/stripe-js':
+        specifier: latest
+        version: 7.3.0
       '@supabase/auth-helpers-nextjs':
         specifier: latest
         version: 0.10.0(@supabase/supabase-js@2.49.4)
@@ -1791,6 +1797,17 @@ packages:
 
   '@standard-schema/utils@0.3.0':
     resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
+
+  '@stripe/react-stripe-js@3.7.0':
+    resolution: {integrity: sha512-PYls/2S9l0FF+2n0wHaEJsEU8x7CmBagiH7zYOsxbBlLIHEsqUIQ4MlIAbV9Zg6xwT8jlYdlRIyBTHmO3yM7kQ==}
+    peerDependencies:
+      '@stripe/stripe-js': '>=1.44.1 <8.0.0'
+      react: '>=16.8.0 <20.0.0'
+      react-dom: '>=16.8.0 <20.0.0'
+
+  '@stripe/stripe-js@7.3.0':
+    resolution: {integrity: sha512-xnCyFIEI5SQnQrKkCxVj7nS5fWTZap+zuIGzmmxLMdlmgahFJaihK4zogqE8YyKKTLtrp/EldkEijSgtXsRVDg==}
+    engines: {node: '>=12.16'}
 
   '@supabase/auth-helpers-nextjs@0.10.0':
     resolution: {integrity: sha512-2dfOGsM4yZt0oS4TPiE7bD4vf7EVz7NRz/IJrV6vLg0GP7sMUx8wndv2euLGq4BjN9lUCpu6DG/uCC8j+ylwPg==}
@@ -5856,6 +5873,15 @@ snapshots:
   '@sqltools/formatter@1.2.5': {}
 
   '@standard-schema/utils@0.3.0': {}
+
+  '@stripe/react-stripe-js@3.7.0(@stripe/stripe-js@7.3.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
+    dependencies:
+      '@stripe/stripe-js': 7.3.0
+      prop-types: 15.8.1
+      react: 19.0.0
+      react-dom: 19.0.0(react@19.0.0)
+
+  '@stripe/stripe-js@7.3.0': {}
 
   '@supabase/auth-helpers-nextjs@0.10.0(@supabase/supabase-js@2.49.4)':
     dependencies:

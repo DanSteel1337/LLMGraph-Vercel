@@ -40,7 +40,30 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(redirectUrl)
     }
 
-    return res
+    // Clone the response
+    const response = NextResponse.next()
+
+    // Add security headers
+    const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    img-src 'self' data: https://*.stripe.com;
+    font-src 'self' https://fonts.gstatic.com;
+    connect-src 'self' https://*.stripe.com https://api.openai.com;
+    frame-src 'self' https://*.stripe.com;
+  `
+      .replace(/\s{2,}/g, " ")
+      .trim()
+
+    response.headers.set("Content-Security-Policy", cspHeader)
+
+    // Add other security headers
+    response.headers.set("X-Content-Type-Options", "nosniff")
+    response.headers.set("X-Frame-Options", "DENY")
+    response.headers.set("X-XSS-Protection", "1; mode=block")
+
+    return response
   } catch (error) {
     console.error("Middleware error:", error)
     // Return the original response if there's an error
@@ -48,15 +71,10 @@ export async function middleware(req: NextRequest) {
   }
 }
 
-// Configure the middleware to run on specific paths
+// Only apply middleware to API routes and pages that need it
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    // Apply to all routes except static files and api routes that need to bypass CSP
+    "/((?!_next/static|_next/image|favicon.ico|api/bypass-csp).*)",
   ],
 }
