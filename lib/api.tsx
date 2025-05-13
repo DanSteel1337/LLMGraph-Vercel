@@ -226,10 +226,11 @@ export async function submitFeedback(data: {
 // Check health
 export async function checkHealth(): Promise<any> {
   try {
+    console.log("Initiating health check")
     // Add cache-busting parameter and timeout
     const timestamp = new Date().getTime()
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout (increased from 5)
 
     const response = await fetch(`/api/health?_=${timestamp}`, {
       headers: {
@@ -241,17 +242,32 @@ export async function checkHealth(): Promise<any> {
 
     clearTimeout(timeoutId) // Clear the timeout if the request completes
 
+    // Even if the response is not OK, try to parse the JSON response
+    // as our API now returns 200 with error details instead of 500
+    const data = await response.json().catch((e) => {
+      console.error("Failed to parse health check response:", e)
+      return null
+    })
+
+    if (data) {
+      console.log("Health check completed with status:", data.status)
+      if (data.debug?.errors?.length > 0) {
+        console.warn("Health check errors:", data.debug.errors)
+      }
+      return data
+    }
+
     if (!response.ok) {
       const errorText = await response.text().catch(() => "Unknown error")
       console.error(`Health API returned status ${response.status}: ${errorText}`)
       throw new Error(`Health check failed: ${response.statusText || response.status}`)
     }
 
-    return await response.json()
+    throw new Error("Failed to get valid health check data")
   } catch (error) {
     // Provide detailed error logging
     if (error.name === "AbortError") {
-      console.error("Health check timed out after 5 seconds")
+      console.error("Health check timed out after 10 seconds")
     } else {
       console.error("Error checking health:", error)
     }
@@ -265,6 +281,10 @@ export async function checkHealth(): Promise<any> {
       openai: { status: "unknown", message: "Could not check OpenAI status" },
       error: error instanceof Error ? error.message : String(error),
       timestamp: new Date().toISOString(),
+      debug: {
+        clientError: error instanceof Error ? error.message : String(error),
+        clientStack: error instanceof Error ? error.stack : undefined,
+      },
     }
   }
 }

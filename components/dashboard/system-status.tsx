@@ -4,9 +4,10 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { CheckCircle, XCircle, AlertTriangle, RefreshCw } from "lucide-react"
+import { CheckCircle, XCircle, AlertTriangle, RefreshCw, Info } from "lucide-react"
 import { checkHealth } from "@/lib/api"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface SystemStatus {
   status: "healthy" | "unhealthy" | "degraded" | "unknown"
@@ -16,6 +17,12 @@ interface SystemStatus {
     message?: string
   }[]
   lastChecked: string
+  debug?: {
+    errors?: string[]
+    warnings?: string[]
+    info?: string[]
+    clientError?: string
+  }
 }
 
 export function SystemStatus() {
@@ -23,6 +30,7 @@ export function SystemStatus() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [showDebug, setShowDebug] = useState(false)
 
   const fetchSystemStatus = async () => {
     try {
@@ -57,6 +65,12 @@ export function SystemStatus() {
           },
         ],
         lastChecked: healthData.timestamp || new Date().toISOString(),
+        debug: {
+          errors: healthData.debug?.errors || [],
+          warnings: healthData.debug?.warnings || [],
+          info: healthData.debug?.info || [],
+          clientError: healthData.debug?.clientError,
+        },
       }
 
       setStatus(systemStatus)
@@ -74,6 +88,9 @@ export function SystemStatus() {
           { name: "OpenAI", status: "unknown" },
         ],
         lastChecked: new Date().toISOString(),
+        debug: {
+          clientError: error instanceof Error ? error.message : String(error),
+        },
       })
     } finally {
       setIsLoading(false)
@@ -133,9 +150,23 @@ export function SystemStatus() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">System Status</CardTitle>
-        {!isLoading && !error && status && (
-          <Badge variant={getStatusBadgeVariant(status.status)}>{getStatusText(status.status)}</Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {!isLoading && !error && status && (
+            <Badge variant={getStatusBadgeVariant(status.status)}>{getStatusText(status.status)}</Badge>
+          )}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowDebug(!showDebug)}>
+                  <Info className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Toggle debug information</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </CardHeader>
       <CardContent>
         {isLoading && !isRefreshing ? (
@@ -157,22 +188,79 @@ export function SystemStatus() {
                     <span className="text-sm">{component.name}</span>
                     <div className="flex items-center gap-1">
                       {getStatusIcon(component.status)}
-                      <span
-                        className={`text-xs ${
-                          component.status === "healthy"
-                            ? "text-green-500"
-                            : component.status === "degraded"
-                              ? "text-yellow-500"
-                              : component.status === "unhealthy"
-                                ? "text-red-500"
-                                : "text-gray-500"
-                        }`}
-                      >
-                        {component.status}
-                      </span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className={`text-xs ${
+                                component.status === "healthy"
+                                  ? "text-green-500"
+                                  : component.status === "degraded"
+                                    ? "text-yellow-500"
+                                    : component.status === "unhealthy"
+                                      ? "text-red-500"
+                                      : "text-gray-500"
+                              }`}
+                            >
+                              {component.status}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{component.message || component.status}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   </div>
                 ))}
+
+                {/* Debug information section */}
+                {showDebug && status.debug && (
+                  <div className="mt-4 pt-2 border-t text-xs">
+                    <div className="font-semibold mb-1">Debug Information:</div>
+
+                    {status.debug.errors && status.debug.errors.length > 0 && (
+                      <div className="mb-2">
+                        <div className="text-red-500 font-medium">Errors:</div>
+                        <ul className="list-disc pl-4 text-red-500">
+                          {status.debug.errors.map((err, i) => (
+                            <li key={i}>{err}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {status.debug.warnings && status.debug.warnings.length > 0 && (
+                      <div className="mb-2">
+                        <div className="text-yellow-500 font-medium">Warnings:</div>
+                        <ul className="list-disc pl-4 text-yellow-500">
+                          {status.debug.warnings.map((warn, i) => (
+                            <li key={i}>{warn}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {status.debug.info && status.debug.info.length > 0 && (
+                      <div className="mb-2">
+                        <div className="text-blue-500 font-medium">Info:</div>
+                        <ul className="list-disc pl-4 text-blue-500">
+                          {status.debug.info.map((info, i) => (
+                            <li key={i}>{info}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {status.debug.clientError && (
+                      <div className="mb-2">
+                        <div className="text-red-500 font-medium">Client Error:</div>
+                        <div className="text-red-500">{status.debug.clientError}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between mt-4 pt-2 border-t">
                   <div className="text-xs text-muted-foreground">
                     Last checked: {new Date(status.lastChecked).toLocaleTimeString()}
