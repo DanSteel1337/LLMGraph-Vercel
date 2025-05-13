@@ -2,7 +2,10 @@ import { NextResponse } from "next/server"
 import { getPineconeStats, checkOpenAIHealth } from "@/lib/ai-sdk"
 import { getApiSupabaseClient, withRetry } from "@/lib/supabase/api-client"
 
+export const runtime = "nodejs" // Change from edge to nodejs for better stability
+
 export async function GET() {
+  // Initialize health status with default values
   const healthStatus = {
     status: "healthy",
     api: {
@@ -29,16 +32,20 @@ export async function GET() {
     const supabase = getApiSupabaseClient()
 
     // Use withRetry to handle transient connection issues
-    await withRetry(async () => {
-      const { data, error } = await supabase.from("documents").select("id").limit(1)
+    await withRetry(
+      async () => {
+        const { data, error } = await supabase.from("documents").select("id").limit(1)
 
-      if (error) {
-        console.error("Database health check error:", error)
-        throw error
-      }
+        if (error) {
+          console.error("Database health check error:", error)
+          throw error
+        }
 
-      return data
-    })
+        return data
+      },
+      3,
+      1000,
+    ) // 3 retries, 1 second delay
 
     // If we get here, the database connection is healthy
     healthStatus.database.status = "healthy"
@@ -54,7 +61,11 @@ export async function GET() {
   try {
     const pineconeStats = await getPineconeStats()
 
-    if (pineconeStats.vectorCount === 0 && pineconeStats.dimensions === 0) {
+    if (!pineconeStats) {
+      healthStatus.pinecone.status = "unhealthy"
+      healthStatus.pinecone.message = "Failed to get Pinecone stats"
+      healthStatus.status = "degraded"
+    } else if (pineconeStats.vectorCount === 0 && pineconeStats.dimensions === 0) {
       healthStatus.pinecone.status = "degraded"
       healthStatus.pinecone.message = "Pinecone connection established but no vectors found"
       healthStatus.status = "degraded"
@@ -67,10 +78,17 @@ export async function GET() {
   }
 
   // Check OpenAI connection with our improved function
-  const openAIHealth = await checkOpenAIHealth()
-  healthStatus.openai = openAIHealth
+  try {
+    const openAIHealth = await checkOpenAIHealth()
+    healthStatus.openai = openAIHealth
 
-  if (openAIHealth.status === "unhealthy") {
+    if (openAIHealth.status === "unhealthy") {
+      healthStatus.status = "degraded"
+    }
+  } catch (error) {
+    console.error("OpenAI health check failed:", error)
+    healthStatus.openai.status = "unhealthy"
+    healthStatus.openai.message = `OpenAI connection failed: ${error instanceof Error ? error.message : String(error)}`
     healthStatus.status = "degraded"
   }
 

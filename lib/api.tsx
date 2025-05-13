@@ -122,16 +122,40 @@ export async function performSearch(params: {
 // Fetch stats
 export async function fetchStats(): Promise<any> {
   try {
-    const response = await fetch("/api/stats")
+    // Add cache-busting parameter to prevent caching issues
+    const timestamp = new Date().getTime()
+    const response = await fetch(`/api/stats?_=${timestamp}`, {
+      // Add proper headers
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-cache",
+      },
+      // Add a reasonable timeout
+      signal: AbortSignal.timeout(5000), // 5 second timeout
+    })
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch stats: ${response.statusText}`)
+      const errorText = await response.text().catch(() => "Unknown error")
+      console.error(`Stats API returned status ${response.status}: ${errorText}`)
+      throw new Error(`Failed to fetch stats: ${response.statusText || response.status}`)
     }
 
-    return await response.json()
+    const data = await response.json()
+    return data
   } catch (error) {
     console.error("Error fetching stats:", error)
-    return null
+
+    // Return fallback data instead of null
+    return {
+      totalDocuments: 0,
+      totalSearches: 0,
+      totalFeedback: 0,
+      vectorCount: 0,
+      dimensions: 0,
+      indexName: "unknown",
+      isError: true,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    }
   }
 }
 
@@ -202,16 +226,46 @@ export async function submitFeedback(data: {
 // Check health
 export async function checkHealth(): Promise<any> {
   try {
-    const response = await fetch("/api/health")
+    // Add cache-busting parameter and timeout
+    const timestamp = new Date().getTime()
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
+    const response = await fetch(`/api/health?_=${timestamp}`, {
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-cache",
+      },
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId) // Clear the timeout if the request completes
 
     if (!response.ok) {
-      throw new Error(`Health check failed: ${response.statusText}`)
+      const errorText = await response.text().catch(() => "Unknown error")
+      console.error(`Health API returned status ${response.status}: ${errorText}`)
+      throw new Error(`Health check failed: ${response.statusText || response.status}`)
     }
 
     return await response.json()
   } catch (error) {
-    console.error("Error checking health:", error)
-    return { status: "unhealthy", error: String(error) }
+    // Provide detailed error logging
+    if (error.name === "AbortError") {
+      console.error("Health check timed out after 5 seconds")
+    } else {
+      console.error("Error checking health:", error)
+    }
+
+    // Return fallback health data
+    return {
+      status: "unhealthy",
+      api: { status: "unknown", message: "Could not check API status" },
+      database: { status: "unknown", message: "Could not check database status" },
+      pinecone: { status: "unknown", message: "Could not check Pinecone status" },
+      openai: { status: "unknown", message: "Could not check OpenAI status" },
+      error: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString(),
+    }
   }
 }
 
