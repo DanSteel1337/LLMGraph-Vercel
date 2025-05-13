@@ -188,32 +188,15 @@ export async function getPopularSearches(): Promise<{ query: string; count: numb
   try {
     const supabase = createClientComponentClient<Database>()
 
-    // Use a proper aggregation query with GROUP BY
+    // Use our new SQL function
     const { data, error } = await supabase.rpc("get_popular_searches", { limit_count: 5 })
 
     if (error) {
       console.error("Error fetching popular searches:", error)
-
-      // Fallback to a simpler query if the RPC function doesn't exist
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from("search_history")
-        .select("query")
-        .order("count", { ascending: false })
-        .limit(5)
-
-      if (fallbackError) {
-        console.error("Error in fallback query:", fallbackError)
-        return []
-      }
-
-      // Convert the fallback data to the expected format
-      return fallbackData.map((item) => ({
-        query: item.query,
-        count: 1, // We don't have the actual count in this fallback
-      }))
+      return []
     }
 
-    return data as unknown as { query: string; count: number }[]
+    return data as { query: string; count: number }[]
   } catch (error) {
     console.error("Error fetching popular searches:", error)
     return []
@@ -274,33 +257,15 @@ export async function recordSearchQuery(query: string, resultsCount: number): Pr
   try {
     const supabase = createClientComponentClient<Database>()
 
-    // Check if query already exists
-    const { data, error } = await supabase.from("search_history").select("*").eq("query", query).single()
-
-    if (error && error.code !== "PGRST116") {
-      // PGRST116 is the error code for "no rows returned"
-      console.error("Error checking search history:", error)
-      return
-    }
-
-    if (data) {
-      // Update existing query
-      await supabase
-        .from("search_history")
-        .update({
-          count: data.count + 1,
-          last_searched_at: new Date().toISOString(),
-          results_count: resultsCount,
-        })
-        .eq("id", data.id)
-    } else {
-      // Insert new query
-      await supabase.from("search_history").insert({
-        query,
-        count: 1,
-        results_count: resultsCount,
-      })
-    }
+    // Since there's no count column, we'll just insert a new record each time
+    // This way our get_popular_searches function can count occurrences
+    await supabase.from("search_history").insert({
+      query,
+      results_count: resultsCount,
+      // Generate a random UUID for the id
+      id: crypto.randomUUID(),
+      // user_id can be null according to the schema
+    })
   } catch (error) {
     console.error("Error recording search query:", error)
   }
