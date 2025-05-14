@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
+import { getPineconeStats, checkOpenAIHealth } from "@/lib/ai-sdk"
 import { createClient } from "@supabase/supabase-js"
 
-// Use Node.js runtime since Pinecone requires Node.js modules
-export const runtime = "nodejs"
+// Revert to edge runtime which was working before
+export const runtime = "edge"
 
-// Create a fresh Supabase client for each request
+// Create a fresh Supabase client for each request (no singleton)
 function getSupabaseClient() {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -37,87 +38,12 @@ function checkRequiredEnvVars() {
   }
 }
 
-// Simple function to check Pinecone connection without using problematic features
-async function checkPineconeConnection() {
-  try {
-    // Only import Pinecone in the server environment
-    const { Pinecone } = await import("@pinecone-database/pinecone")
-
-    if (!process.env.PINECONE_API_KEY) {
-      throw new Error("PINECONE_API_KEY is not defined")
-    }
-
-    if (!process.env.PINECONE_INDEX_NAME) {
-      throw new Error("PINECONE_INDEX_NAME is not defined")
-    }
-
-    // Create Pinecone client
-    const pinecone = new Pinecone({
-      apiKey: process.env.PINECONE_API_KEY,
-    })
-
-    // Get index
-    const index = pinecone.Index(process.env.PINECONE_INDEX_NAME)
-
-    // Get stats (this doesn't use fs or path)
-    const stats = await index.describeIndexStats()
-
-    return {
-      status: "healthy",
-      message: "Pinecone connection established",
-      stats: {
-        vectorCount: stats.totalVectorCount,
-        dimensions: stats.dimension || 0,
-      },
-    }
-  } catch (error) {
-    console.error("Pinecone health check failed:", error)
-    return {
-      status: "unhealthy",
-      message: `Pinecone connection failed: ${error instanceof Error ? error.message : String(error)}`,
-      error: error instanceof Error ? error.message : String(error),
-    }
-  }
-}
-
-// Simple function to check OpenAI connection
-async function checkOpenAIConnection() {
-  try {
-    // Only import OpenAI in the server environment
-    const { embed } = await import("ai")
-    const { openai } = await import("@ai-sdk/openai")
-
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error("OPENAI_API_KEY is not defined")
-    }
-
-    // Test embedding with a simple string
-    const { embedding } = await embed({
-      model: openai.embedding("text-embedding-3-small"),
-      value: "test",
-    })
-
-    return {
-      status: "healthy",
-      message: "OpenAI connection established",
-      embeddingLength: embedding.length,
-    }
-  } catch (error) {
-    console.error("OpenAI health check failed:", error)
-    return {
-      status: "unhealthy",
-      message: `OpenAI connection failed: ${error instanceof Error ? error.message : String(error)}`,
-      error: error instanceof Error ? error.message : String(error),
-    }
-  }
-}
-
 export async function GET() {
   console.log("Health check API called")
 
   // Initialize health status with default values
   const healthStatus = {
-    status: "checking",
+    status: "degraded", // Start with degraded and upgrade to healthy if all checks pass
     api: {
       status: "healthy",
       message: "API is operational",
@@ -178,7 +104,7 @@ export async function GET() {
 
       // Simple query to check connection with timeout
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 second timeout
 
       const { data, error } = await supabase.from("documents").select("id").limit(1)
       clearTimeout(timeoutId)
@@ -199,25 +125,32 @@ export async function GET() {
       healthStatus.debug.errors.push(`Database error: ${error instanceof Error ? error.message : String(error)}`)
     }
 
-    // Check Pinecone connection
+    // Check Pinecone connection with timeout
     try {
       console.log("Checking Pinecone connection")
 
       // Add timeout for Pinecone check
-      const pineconePromise = checkPineconeConnection()
+      const pineconePromise = getPineconeStats()
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Pinecone check timed out after 5 seconds")), 5000),
+        setTimeout(() => reject(new Error("Pinecone check timed out after 3 seconds")), 3000),
       )
 
-      const pineconeResult = (await Promise.race([pineconePromise, timeoutPromise])) as any
+      const pineconeStats = (await Promise.race([pineconePromise, timeoutPromise])) as any
 
-      // Update health status with Pinecone result
-      healthStatus.pinecone = pineconeResult
-
-      if (pineconeResult.status === "unhealthy") {
-        healthStatus.debug.errors.push(`Pinecone error: ${pineconeResult.message}`)
+      if (!pineconeStats) {
+        healthStatus.pinecone.status = "unhealthy"
+        healthStatus.pinecone.message = "Failed to get Pinecone stats"
+        healthStatus.debug.errors.push("Pinecone stats returned null or undefined")
+      } else if (pineconeStats.vectorCount === 0 && pineconeStats.dimensions === 0) {
+        healthStatus.pinecone.status = "degraded"
+        healthStatus.pinecone.message = "Pinecone connection established but no vectors found"
+        healthStatus.debug.warnings.push("Pinecone has no vectors")
       } else {
-        healthStatus.debug.info.push("Pinecone connection successful")
+        healthStatus.pinecone.status = "healthy"
+        healthStatus.pinecone.message = "Pinecone connection established"
+        healthStatus.debug.info.push(
+          `Pinecone stats: ${pineconeStats.vectorCount} vectors, ${pineconeStats.dimensions} dimensions`,
+        )
       }
     } catch (error) {
       console.error("Pinecone health check failed:", error)
@@ -226,23 +159,22 @@ export async function GET() {
       healthStatus.debug.errors.push(`Pinecone error: ${error instanceof Error ? error.message : String(error)}`)
     }
 
-    // Check OpenAI connection
+    // Check OpenAI connection with timeout
     try {
       console.log("Checking OpenAI connection")
 
       // Add timeout for OpenAI check
-      const openAIPromise = checkOpenAIConnection()
+      const openAIPromise = checkOpenAIHealth()
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("OpenAI check timed out after 5 seconds")), 5000),
+        setTimeout(() => reject(new Error("OpenAI check timed out after 3 seconds")), 3000),
       )
 
-      const openAIResult = (await Promise.race([openAIPromise, timeoutPromise])) as any
+      const openAIHealth = (await Promise.race([openAIPromise, timeoutPromise])) as any
 
-      // Update health status with OpenAI result
-      healthStatus.openai = openAIResult
+      healthStatus.openai = openAIHealth
 
-      if (openAIResult.status === "unhealthy") {
-        healthStatus.debug.errors.push(`OpenAI error: ${openAIResult.message}`)
+      if (openAIHealth.status === "unhealthy") {
+        healthStatus.debug.errors.push(`OpenAI error: ${openAIHealth.message}`)
       } else {
         healthStatus.debug.info.push("OpenAI connection successful")
       }
