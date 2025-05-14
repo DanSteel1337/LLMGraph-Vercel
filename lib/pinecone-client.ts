@@ -102,3 +102,26 @@ export async function deleteVectorsByFilter(filter: any, indexName?: string, cli
     throw error
   }
 }
+
+// Add this function to your pinecone-client.ts file
+
+export async function getDocumentVectors(documentId: string) {
+  try {
+    const pinecone = await createPineconeClient()
+    const indexName = process.env.PINECONE_INDEX_NAME || "unrealengine54"
+
+    const index = pinecone.index(indexName)
+
+    const queryResponse = await index.query({
+      filter: { document_id: { $eq: documentId } },
+      includeMetadata: true,
+      includeValues: true,
+      topK: 100,
+    })
+
+    return queryResponse.matches || []
+  } catch (error) {
+    console.error(`Error fetching vectors for document ${documentId}:`, error)
+    throw error
+  }
+}

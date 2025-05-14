@@ -343,3 +343,29 @@ export async function recordSearchQuery(query: string, resultsCount: number): Pr
     console.error("Error recording search query:", error)
   }
 }
+
+// Add this function to your existing db.ts file
+
+export async function getDocumentChunks(documentId: string) {
+  try {
+    const supabase = getSupabase()
+
+    const { data, error } = await withRetry(async () => {
+      return await supabase
+        .from("document_chunks")
+        .select("*")
+        .eq("document_id", documentId)
+        .order("chunk_index", { ascending: true })
+    })
+
+    if (error) {
+      console.error(`Error fetching chunks for document ${documentId}:`, error)
+      throw error
+    }
+
+    return data || []
+  } catch (error) {
+    console.error(`Error fetching chunks for document ${documentId}:`, error)
+    throw error
+  }
+}
