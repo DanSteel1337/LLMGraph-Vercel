@@ -1,6 +1,11 @@
 import { embed, generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
-import { Pinecone } from "@pinecone-database/pinecone"
+import {
+  getPineconeStats as getPineconeStatsUtil,
+  querySimilarVectors,
+  upsertVectors,
+  deleteVectorsByFilter,
+} from "./pinecone-client"
 
 // Add retry logic for OpenAI operations
 export async function embedWithRetry(text: string, retries = 3, delay = 1000) {
@@ -28,28 +33,6 @@ export async function embedWithRetry(text: string, retries = 3, delay = 1000) {
   throw new Error(`Failed to generate embedding after ${retries} attempts: ${lastError?.message || lastError}`)
 }
 
-// Create a fresh Pinecone client for each request (no singleton)
-function getPineconeClient() {
-  if (!process.env.PINECONE_API_KEY) {
-    throw new Error("PINECONE_API_KEY is not defined")
-  }
-
-  if (!process.env.PINECONE_INDEX_NAME) {
-    throw new Error("PINECONE_INDEX_NAME is not defined")
-  }
-
-  try {
-    const pinecone = new Pinecone({
-      apiKey: process.env.PINECONE_API_KEY,
-    })
-
-    return pinecone.Index(process.env.PINECONE_INDEX_NAME)
-  } catch (error) {
-    console.error("Error initializing Pinecone client:", error)
-    throw error
-  }
-}
-
 // Process a document and store it in Pinecone
 export async function processDocument(
   documentId: string,
@@ -58,9 +41,6 @@ export async function processDocument(
 ): Promise<boolean> {
   try {
     console.log(`Processing document ${documentId} for Pinecone storage`)
-
-    // Get a fresh Pinecone client
-    const pineconeIndex = getPineconeClient()
 
     // Split text into chunks (simplified for edge compatibility)
     const chunkSize = 1000
@@ -96,7 +76,7 @@ export async function processDocument(
     )
 
     // Upsert vectors to Pinecone
-    await pineconeIndex.upsert(vectors)
+    await upsertVectors(vectors)
     console.log(`Successfully stored ${vectors.length} vectors in Pinecone`)
 
     return true
@@ -111,9 +91,6 @@ export async function searchSimilarDocuments(query: string, filters?: Record<str
   try {
     console.log(`Searching for documents similar to: "${query}"`)
 
-    // Get a fresh Pinecone client
-    const pineconeIndex = getPineconeClient()
-
     // Generate embedding for the query
     const embedding = await embedWithRetry(query)
 
@@ -121,12 +98,7 @@ export async function searchSimilarDocuments(query: string, filters?: Record<str
     const filterObj = filters ? { metadata: filters } : undefined
 
     // Query Pinecone
-    const results = await pineconeIndex.query({
-      vector: embedding,
-      topK,
-      includeMetadata: true,
-      filter: filterObj,
-    })
+    const results = await querySimilarVectors(embedding, topK, filterObj)
 
     console.log(`Found ${results.matches?.length || 0} matches in Pinecone`)
 
@@ -201,14 +173,9 @@ export async function deleteDocumentVectors(documentId: string): Promise<boolean
   try {
     console.log(`Deleting vectors for document ${documentId}`)
 
-    // Get a fresh Pinecone client
-    const pineconeIndex = getPineconeClient()
-
     // Delete all vectors with matching documentId in metadata
-    await pineconeIndex.deleteMany({
-      filter: {
-        documentId: { $eq: documentId },
-      },
+    await deleteVectorsByFilter({
+      documentId: { $eq: documentId },
     })
 
     console.log(`Successfully deleted vectors for document ${documentId}`)
@@ -226,17 +193,7 @@ export async function getPineconeStats(): Promise<{
   indexName: string
 }> {
   try {
-    // Get a fresh Pinecone client
-    const pineconeIndex = getPineconeClient()
-
-    // Get index stats
-    const indexStats = await pineconeIndex.describeIndexStats()
-
-    return {
-      vectorCount: indexStats.totalVectorCount,
-      dimensions: indexStats.dimension,
-      indexName: process.env.PINECONE_INDEX_NAME || "unknown",
-    }
+    return await getPineconeStatsUtil()
   } catch (error) {
     console.error("Error getting Pinecone stats:", error)
     return {
