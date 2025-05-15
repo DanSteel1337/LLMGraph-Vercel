@@ -4,13 +4,40 @@
 import type { SearchResult } from "@/components/search/search-interface"
 import type { Document } from "@/components/documents/document-management"
 
-// Helper function to handle API errors
-async function handleApiResponse(response: Response) {
+// Define Feedback type to match what's expected in the application
+export interface Feedback {
+  id: string
+  query: string
+  result: string
+  rating: number
+  comment?: string
+  status: "pending" | "reviewed" | "resolved"
+  createdAt: string
+  userId?: string
+}
+
+// Standard API response type
+interface ApiResponse<T> {
+  data: T
+  error?: string
+  metadata?: Record<string, any>
+}
+
+// Helper function to handle API errors with standardized response format
+async function handleApiResponse<T>(response: Response): Promise<ApiResponse<T>> {
   if (!response.ok) {
     const errorText = await response.text().catch(() => "Unknown error")
     throw new Error(`API error (${response.status}): ${errorText}`)
   }
-  return response.json()
+
+  const jsonData = await response.json()
+
+  // Standardize the response format
+  return {
+    data: jsonData.documents || jsonData.feedback || jsonData.results || jsonData.data || jsonData,
+    error: jsonData.error,
+    metadata: jsonData.metadata || {},
+  }
 }
 
 // Fetch documents
@@ -22,12 +49,17 @@ export async function fetchDocuments(): Promise<Document[]> {
       },
     })
 
-    const data = await handleApiResponse(response)
+    const result = await handleApiResponse<any[]>(response)
 
-    return data.map((doc: any) => ({
+    if (!Array.isArray(result.data)) {
+      console.warn("Expected array of documents but got:", typeof result.data)
+      return []
+    }
+
+    return result.data.map((doc: any) => ({
       id: doc.id,
-      title: doc.title,
-      category: doc.category,
+      title: doc.title || "Untitled Document",
+      category: doc.category || "Uncategorized",
       version: doc.metadata?.version || "",
       uploadedAt: doc.created_at || new Date().toISOString(),
       status: doc.status || "processed",
@@ -35,7 +67,8 @@ export async function fetchDocuments(): Promise<Document[]> {
     }))
   } catch (error) {
     console.error("Error fetching documents:", error)
-    throw error
+    // Return empty array as fallback
+    return []
   }
 }
 
@@ -46,11 +79,11 @@ export async function deleteDocument(id: string): Promise<boolean> {
       method: "DELETE",
     })
 
-    await handleApiResponse(response)
+    await handleApiResponse<{ success: boolean }>(response)
     return true
   } catch (error) {
     console.error("Error deleting document:", error)
-    throw error
+    return false
   }
 }
 
@@ -65,11 +98,63 @@ export async function updateDocument(id: string, data: Partial<Document>): Promi
       body: JSON.stringify(data),
     })
 
-    const result = await handleApiResponse(response)
-    return result.document
+    const result = await handleApiResponse<{ document: Document }>(response)
+    return result.data.document || null
   } catch (error) {
     console.error("Error updating document:", error)
-    throw error
+    return null
+  }
+}
+
+// Fetch feedback
+export async function fetchFeedback(): Promise<Feedback[]> {
+  try {
+    const response = await fetch("/api/feedback", {
+      headers: {
+        "Cache-Control": "no-cache",
+      },
+    })
+
+    const result = await handleApiResponse<any[]>(response)
+
+    if (!Array.isArray(result.data)) {
+      console.warn("Expected array of feedback but got:", typeof result.data)
+      return []
+    }
+
+    return result.data.map((item: any) => ({
+      id: item.id,
+      query: item.query || "",
+      result: item.result || "",
+      rating: item.rating || 0,
+      comment: item.comment || "",
+      status: item.status || "pending",
+      createdAt: item.created_at || new Date().toISOString(),
+      userId: item.user_id || undefined,
+    }))
+  } catch (error) {
+    console.error("Error fetching feedback:", error)
+    // Return empty array as fallback
+    return []
+  }
+}
+
+// Update feedback status
+export async function updateFeedbackStatus(id: string, status: "pending" | "reviewed" | "resolved"): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/feedback/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status }),
+    })
+
+    await handleApiResponse<{ success: boolean }>(response)
+    return true
+  } catch (error) {
+    console.error("Error updating feedback status:", error)
+    return false
   }
 }
 
@@ -104,15 +189,18 @@ export async function performSearch(params: {
     }
 
     const response = await fetch(`/api/search?${queryParams.toString()}`)
-    const data = await handleApiResponse(response)
+    const result = await handleApiResponse<{ results: SearchResult[]; answer?: string }>(response)
 
     return {
-      results: data.results || [],
-      answer: data.answer || null,
+      results: Array.isArray(result.data.results) ? result.data.results : [],
+      answer: result.data.answer || undefined,
     }
   } catch (error) {
     console.error("Error performing search:", error)
-    throw error
+    // Return empty results as fallback
+    return {
+      results: [],
+    }
   }
 }
 
@@ -131,7 +219,8 @@ export async function fetchStats(): Promise<any> {
       signal: AbortSignal.timeout(5000), // 5 second timeout
     })
 
-    return await handleApiResponse(response)
+    const result = await handleApiResponse<any>(response)
+    return result.data
   } catch (error) {
     console.error("Error fetching stats:", error)
 
@@ -172,7 +261,8 @@ export async function processPDF(
       body: formData,
     })
 
-    return await handleApiResponse(response)
+    const result = await handleApiResponse<any>(response)
+    return result.data
   } catch (error) {
     console.error("Error processing PDF:", error)
     throw error
@@ -198,7 +288,8 @@ export async function checkHealth(): Promise<any> {
 
     clearTimeout(timeoutId) // Clear the timeout if the request completes
 
-    return await handleApiResponse(response)
+    const result = await handleApiResponse<any>(response)
+    return result.data
   } catch (error) {
     // Provide detailed error logging
     if (error.name === "AbortError") {

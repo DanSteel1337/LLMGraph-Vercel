@@ -1,15 +1,14 @@
 import type React from "react"
+import "./globals.css"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "@/components/ui/toaster"
+import { NavigationProvider } from "@/contexts/navigation-context"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "UE RAG Dashboard",
-  description: "Unreal Engine Documentation RAG System",
+  title: "Unreal Engine Documentation",
+  description: "Search and explore Unreal Engine documentation with AI-powered search",
     generator: 'v0.dev'
 }
 
@@ -21,10 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {children}
-          <Toaster />
-        </ThemeProvider>
+        <NavigationProvider>{children}</NavigationProvider>
       </body>
     </html>
   )

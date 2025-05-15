@@ -57,6 +57,24 @@ export async function querySimilarVectors(vector: number[], topK = 5, filter?: a
   }
 }
 
+// New function: Query with namespace support
+export async function querySimilarVectorsWithNamespace(vector: number[], namespace: string, topK = 5, filter?: any) {
+  try {
+    const index = await getPineconeIndex()
+    const results = await index.query({
+      vector,
+      topK,
+      includeMetadata: true,
+      filter,
+      namespace,
+    })
+    return results
+  } catch (error) {
+    console.error(`Error querying Pinecone in namespace ${namespace}:`, error)
+    throw error
+  }
+}
+
 export async function upsertVectors(vectors: any[]) {
   try {
     const index = await getPineconeIndex()
@@ -64,6 +82,21 @@ export async function upsertVectors(vectors: any[]) {
     return true
   } catch (error) {
     console.error("Error upserting vectors to Pinecone:", error)
+    throw error
+  }
+}
+
+// New function: Upsert with namespace support
+export async function upsertVectorsToNamespace(vectors: any[], namespace: string) {
+  try {
+    const index = await getPineconeIndex()
+    await index.upsert({
+      vectors,
+      namespace,
+    })
+    return true
+  } catch (error) {
+    console.error(`Error upserting vectors to Pinecone namespace ${namespace}:`, error)
     throw error
   }
 }
@@ -79,6 +112,21 @@ export async function deleteVectors(ids: string[]) {
   }
 }
 
+// New function: Delete with namespace support
+export async function deleteVectorsFromNamespace(ids: string[], namespace: string) {
+  try {
+    const index = await getPineconeIndex()
+    await index.deleteMany({
+      ids,
+      namespace,
+    })
+    return true
+  } catch (error) {
+    console.error(`Error deleting vectors from Pinecone namespace ${namespace}:`, error)
+    throw error
+  }
+}
+
 export async function deleteVectorsByFilter(filter: any) {
   try {
     const index = await getPineconeIndex()
@@ -86,6 +134,21 @@ export async function deleteVectorsByFilter(filter: any) {
     return true
   } catch (error) {
     console.error("Error deleting vectors by filter from Pinecone:", error)
+    throw error
+  }
+}
+
+// New function: Delete by filter with namespace support
+export async function deleteVectorsByFilterFromNamespace(filter: any, namespace: string) {
+  try {
+    const index = await getPineconeIndex()
+    await index.deleteMany({
+      filter,
+      namespace,
+    })
+    return true
+  } catch (error) {
+    console.error(`Error deleting vectors by filter from Pinecone namespace ${namespace}:`, error)
     throw error
   }
 }
@@ -105,5 +168,70 @@ export async function getDocumentVectors(documentId: string) {
   } catch (error) {
     console.error(`Error fetching vectors for document ${documentId}:`, error)
     throw error
+  }
+}
+
+// New function: Get document vectors from namespace
+export async function getDocumentVectorsFromNamespace(documentId: string, namespace: string) {
+  try {
+    const index = await getPineconeIndex()
+
+    const queryResponse = await index.query({
+      filter: { documentId: { $eq: documentId } },
+      includeMetadata: true,
+      includeValues: true,
+      topK: 100,
+      namespace,
+    })
+
+    return queryResponse.matches || []
+  } catch (error) {
+    console.error(`Error fetching vectors for document ${documentId} from namespace ${namespace}:`, error)
+    throw error
+  }
+}
+
+// New function: Get namespace statistics
+export async function getNamespaceStats() {
+  try {
+    const index = await getPineconeIndex()
+    const stats = await index.describeIndexStats()
+    return stats.namespaces || {}
+  } catch (error) {
+    console.error("Error getting namespace stats:", error)
+    throw error
+  }
+}
+
+// New function: Get detailed index statistics
+export async function getDetailedIndexStats() {
+  try {
+    const index = await getPineconeIndex()
+    const stats = await index.describeIndexStats()
+
+    // Extract more detailed statistics
+    const namespaceStats = stats.namespaces || {}
+    const namespaceNames = Object.keys(namespaceStats)
+
+    // Calculate vectors per namespace
+    const namespaceCounts = namespaceNames.map((name) => ({
+      namespace: name,
+      vectorCount: namespaceStats[name].vectorCount || 0,
+      dimensions: namespaceStats[name].dimensions,
+    }))
+
+    // Get dimension and metric information
+    const indexDetails = {
+      totalVectorCount: stats.totalVectorCount || 0,
+      dimensions: stats.dimension,
+      namespaces: namespaceCounts,
+      indexFullness: stats.totalVectorCount ? stats.totalVectorCount / 1000000 : 0, // Adjust based on your index size
+      indexType: process.env.PINECONE_INDEX_TYPE || "serverless", // or "pod" based on your setup
+    }
+
+    return indexDetails
+  } catch (error) {
+    console.error("Error getting detailed Pinecone stats:", error)
+    return null
   }
 }
