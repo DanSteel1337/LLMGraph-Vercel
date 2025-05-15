@@ -1,24 +1,28 @@
-// This file should only be imported in client components
-// Add "use client" directive to ensure it's not used in server components
-"use client"
-
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/types/supabase"
 
-// Create a singleton for the Supabase client
-let supabaseInstance: ReturnType<typeof createClientComponentClient<Database>> | null = null
+// Create a singleton instance of the Supabase client for client components
+let supabaseClient: ReturnType<typeof createClientComponentClient<Database>> | null = null
 
-export const getSupabaseClient = () => {
-  // We're on the client - use singleton pattern
-  if (!supabaseInstance) {
-    supabaseInstance = createClientComponentClient<Database>({
-      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    })
+export function getSupabaseClient() {
+  if (!supabaseClient) {
+    supabaseClient = createClientComponentClient<Database>()
   }
-
-  return supabaseInstance
+  return supabaseClient
 }
 
-// Export the singleton getter function
-export const supabaseClient = getSupabaseClient()
+// Helper function to check if we're on the client side
+export function isClient() {
+  return typeof window !== "undefined"
+}
+
+// Safely create a client only on the client side
+export function createSafeClient() {
+  if (isClient()) {
+    return getSupabaseClient()
+  }
+  return null
+}
+
+// Type definition for Supabase tables
+export type Tables = Database["public"]["Tables"]

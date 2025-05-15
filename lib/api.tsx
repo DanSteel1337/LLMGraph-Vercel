@@ -1,20 +1,28 @@
 "use client"
 
 // API client for frontend
-import type { SearchResult } from "@/components/search/search-results"
+import type { SearchResult } from "@/components/search/search-interface"
 import type { Document } from "@/components/documents/document-management"
-import type { Feedback } from "@/components/feedback/feedback-management"
+
+// Helper function to handle API errors
+async function handleApiResponse(response: Response) {
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "Unknown error")
+    throw new Error(`API error (${response.status}): ${errorText}`)
+  }
+  return response.json()
+}
 
 // Fetch documents
 export async function fetchDocuments(): Promise<Document[]> {
   try {
-    const response = await fetch("/api/documents")
+    const response = await fetch("/api/documents", {
+      headers: {
+        "Cache-Control": "no-cache",
+      },
+    })
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch documents: ${response.statusText}`)
-    }
-
-    const data = await response.json()
+    const data = await handleApiResponse(response)
 
     return data.map((doc: any) => ({
       id: doc.id,
@@ -22,12 +30,12 @@ export async function fetchDocuments(): Promise<Document[]> {
       category: doc.category,
       version: doc.metadata?.version || "",
       uploadedAt: doc.created_at || new Date().toISOString(),
-      status: "processed",
+      status: doc.status || "processed",
       size: doc.metadata?.size || 0,
     }))
   } catch (error) {
     console.error("Error fetching documents:", error)
-    return []
+    throw error
   }
 }
 
@@ -38,14 +46,11 @@ export async function deleteDocument(id: string): Promise<boolean> {
       method: "DELETE",
     })
 
-    if (!response.ok) {
-      throw new Error(`Failed to delete document: ${response.statusText}`)
-    }
-
+    await handleApiResponse(response)
     return true
   } catch (error) {
     console.error("Error deleting document:", error)
-    return false
+    throw error
   }
 }
 
@@ -60,16 +65,11 @@ export async function updateDocument(id: string, data: Partial<Document>): Promi
       body: JSON.stringify(data),
     })
 
-    if (!response.ok) {
-      throw new Error(`Failed to update document: ${response.statusText}`)
-    }
-
-    const result = await response.json()
-
+    const result = await handleApiResponse(response)
     return result.document
   } catch (error) {
     console.error("Error updating document:", error)
-    return null
+    throw error
   }
 }
 
@@ -104,12 +104,7 @@ export async function performSearch(params: {
     }
 
     const response = await fetch(`/api/search?${queryParams.toString()}`)
-
-    if (!response.ok) {
-      throw new Error(`Failed to perform search: ${response.statusText}`)
-    }
-
-    const data = await response.json()
+    const data = await handleApiResponse(response)
 
     return {
       results: data.results || [],
@@ -117,7 +112,7 @@ export async function performSearch(params: {
     }
   } catch (error) {
     console.error("Error performing search:", error)
-    return { results: [] }
+    throw error
   }
 }
 
@@ -136,14 +131,7 @@ export async function fetchStats(): Promise<any> {
       signal: AbortSignal.timeout(5000), // 5 second timeout
     })
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "Unknown error")
-      console.error(`Stats API returned status ${response.status}: ${errorText}`)
-      throw new Error(`Failed to fetch stats: ${response.statusText || response.status}`)
-    }
-
-    const data = await response.json()
-    return data
+    return await handleApiResponse(response)
   } catch (error) {
     console.error("Error fetching stats:", error)
 
@@ -161,67 +149,33 @@ export async function fetchStats(): Promise<any> {
   }
 }
 
-// Fetch feedback
-export async function fetchFeedback(): Promise<Feedback[]> {
+// Process PDF
+export async function processPDF(
+  file: File,
+  metadata: {
+    title: string
+    category: string
+    version?: string
+    documentId: string
+  },
+): Promise<any> {
   try {
-    const response = await fetch("/api/feedback")
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("title", metadata.title)
+    formData.append("category", metadata.category)
+    formData.append("version", metadata.version || "1.0")
+    formData.append("documentId", metadata.documentId)
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch feedback: ${response.statusText}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.error("Error fetching feedback:", error)
-    return []
-  }
-}
-
-// Update feedback status
-export async function updateFeedbackStatus(id: string, status: "approved" | "rejected"): Promise<boolean> {
-  try {
-    const response = await fetch(`/api/feedback/${id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ status }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to update feedback status: ${response.statusText}`)
-    }
-
-    return true
-  } catch (error) {
-    console.error("Error updating feedback status:", error)
-    return false
-  }
-}
-
-// Submit feedback
-export async function submitFeedback(data: {
-  documentId: string
-  content: string
-  correction: string
-}): Promise<boolean> {
-  try {
-    const response = await fetch("/api/feedback", {
+    const response = await fetch("/api/process-pdf", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
+      body: formData,
     })
 
-    if (!response.ok) {
-      throw new Error(`Failed to submit feedback: ${response.statusText}`)
-    }
-
-    return true
+    return await handleApiResponse(response)
   } catch (error) {
-    console.error("Error submitting feedback:", error)
-    return false
+    console.error("Error processing PDF:", error)
+    throw error
   }
 }
 
@@ -232,7 +186,7 @@ export async function checkHealth(): Promise<any> {
     // Add cache-busting parameter and timeout
     const timestamp = new Date().getTime()
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout (reduced from 10)
+    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
 
     const response = await fetch(`/api/health?_=${timestamp}`, {
       headers: {
@@ -244,28 +198,7 @@ export async function checkHealth(): Promise<any> {
 
     clearTimeout(timeoutId) // Clear the timeout if the request completes
 
-    // Even if the response is not OK, try to parse the JSON response
-    // as our API now returns 200 with error details instead of 500
-    const data = await response.json().catch((e) => {
-      console.error("Failed to parse health check response:", e)
-      return null
-    })
-
-    if (data) {
-      console.log("Health check completed with status:", data.status)
-      if (data.debug?.errors?.length > 0) {
-        console.warn("Health check errors:", data.debug.errors)
-      }
-      return data
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "Unknown error")
-      console.error(`Health API returned status ${response.status}: ${errorText}`)
-      throw new Error(`Health check failed: ${response.statusText || response.status}`)
-    }
-
-    throw new Error("Failed to get valid health check data")
+    return await handleApiResponse(response)
   } catch (error) {
     // Provide detailed error logging
     if (error.name === "AbortError") {
@@ -288,37 +221,5 @@ export async function checkHealth(): Promise<any> {
         clientStack: error instanceof Error ? error.stack : undefined,
       },
     }
-  }
-}
-
-// Fetch categories
-export async function fetchCategories(): Promise<{ id: string; name: string }[]> {
-  try {
-    const response = await fetch("/api/categories")
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch categories: ${response.statusText}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.error("Error fetching categories:", error)
-    return []
-  }
-}
-
-// Fetch versions
-export async function fetchVersions(): Promise<{ id: string; name: string }[]> {
-  try {
-    const response = await fetch("/api/versions")
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch versions: ${response.statusText}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.error("Error fetching versions:", error)
-    return []
   }
 }

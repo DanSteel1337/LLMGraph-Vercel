@@ -1,290 +1,122 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { CheckCircle, XCircle, AlertTriangle, RefreshCw, Info } from "lucide-react"
-import { checkHealth } from "@/lib/api"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { CheckCircle, XCircle, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
-interface SystemStatus {
-  status: "healthy" | "unhealthy" | "degraded" | "unknown"
-  components: {
-    name: string
-    status: "healthy" | "unhealthy" | "degraded" | "unknown"
-    message?: string
-  }[]
-  lastChecked: string
-  debug?: {
-    errors?: string[]
-    warnings?: string[]
-    info?: string[]
-    clientError?: string
+interface ServiceStatus {
+  status: "ok" | "error" | "warning"
+  message: string
+}
+
+interface HealthCheckResponse {
+  status: "ok" | "error" | "warning"
+  timestamp: string
+  services: {
+    database: ServiceStatus
+    // Add other services as needed
   }
 }
 
-export function SystemStatus() {
-  const [status, setStatus] = useState<SystemStatus | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+export default function SystemStatus() {
+  const [health, setHealth] = useState<HealthCheckResponse | null>(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [showDebug, setShowDebug] = useState(false)
-  const [retryCount, setRetryCount] = useState(0)
 
-  const fetchSystemStatus = async () => {
+  const fetchHealthStatus = async () => {
+    setLoading(true)
+    setError(null)
+
     try {
-      setIsRefreshing(true)
-      setError(null)
+      const response = await fetch("/api/health")
 
-      const healthData = await checkHealth()
-
-      // Transform health data into system status
-      const systemStatus: SystemStatus = {
-        status: healthData.status || "unknown",
-        components: [
-          {
-            name: "API Server",
-            status: healthData.api?.status || "unknown",
-            message: healthData.api?.message,
-          },
-          {
-            name: "Database",
-            status: healthData.database?.status || "unknown",
-            message: healthData.database?.message,
-          },
-          {
-            name: "Pinecone",
-            status: healthData.pinecone?.status || "unknown",
-            message: healthData.pinecone?.message,
-          },
-          {
-            name: "OpenAI",
-            status: healthData.openai?.status || "unknown",
-            message: healthData.openai?.message,
-          },
-        ],
-        lastChecked: healthData.timestamp || new Date().toISOString(),
-        debug: {
-          errors: healthData.debug?.errors || [],
-          warnings: healthData.debug?.warnings || [],
-          info: healthData.debug?.info || [],
-          clientError: healthData.debug?.clientError || healthData.error,
-        },
+      if (!response.ok) {
+        throw new Error(`Health check failed: ${response.status} ${response.statusText}`)
       }
 
-      setStatus(systemStatus)
-    } catch (error) {
-      console.error("Error fetching system status:", error)
-      setError("Failed to fetch system status")
-
-      // Set a fallback status when the health check fails completely
-      setStatus({
-        status: "unknown",
-        components: [
-          { name: "API Server", status: "unknown" },
-          { name: "Database", status: "unknown" },
-          { name: "Pinecone", status: "unknown" },
-          { name: "OpenAI", status: "unknown" },
-        ],
-        lastChecked: new Date().toISOString(),
-        debug: {
-          clientError: error instanceof Error ? error.message : String(error),
-        },
-      })
+      const data = await response.json()
+      setHealth(data)
+    } catch (err) {
+      console.error("Error fetching health status:", err)
+      setError(err instanceof Error ? err.message : "Unknown error")
     } finally {
-      setIsLoading(false)
-      setIsRefreshing(false)
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchSystemStatus()
+    fetchHealthStatus()
+  }, [])
 
-    // Refresh status every 5 minutes
-    const interval = setInterval(fetchSystemStatus, 5 * 60 * 1000)
-
-    return () => clearInterval(interval)
-  }, [retryCount])
-
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusIcon = (status: "ok" | "error" | "warning") => {
     switch (status) {
-      case "healthy":
-        return "success"
-      case "degraded":
-        return "warning"
-      case "unhealthy":
-        return "destructive"
-      default:
-        return "secondary"
+      case "ok":
+        return <CheckCircle className="h-5 w-5 text-green-500" />
+      case "error":
+        return <XCircle className="h-5 w-5 text-red-500" />
+      case "warning":
+        return <AlertTriangle className="h-5 w-5 text-yellow-500" />
     }
-  }
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "healthy":
-        return "All Systems Operational"
-      case "degraded":
-        return "Degraded Performance"
-      case "unhealthy":
-        return "System Issues Detected"
-      default:
-        return "Status Unknown"
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "healthy":
-        return <CheckCircle className="h-4 w-4 text-green-500" />
-      case "degraded":
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />
-      case "unhealthy":
-        return <XCircle className="h-4 w-4 text-red-500" />
-      default:
-        return <AlertTriangle className="h-4 w-4 text-gray-500" />
-    }
-  }
-
-  const handleRetry = () => {
-    setRetryCount((prev) => prev + 1)
   }
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">System Status</CardTitle>
-        <div className="flex items-center gap-2">
-          {!isLoading && !error && status && (
-            <Badge variant={getStatusBadgeVariant(status.status)}>{getStatusText(status.status)}</Badge>
-          )}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowDebug(!showDebug)}>
-                  <Info className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Toggle debug information</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+      <CardHeader>
+        <CardTitle>System Status</CardTitle>
+        <CardDescription>Current status of system components</CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading && !isRefreshing ? (
-          <div className="space-y-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between">
-                <Skeleton className="h-4 w-[100px]" />
-                <Skeleton className="h-4 w-[80px]" />
-              </div>
-            ))}
+        {loading ? (
+          <div className="flex justify-center">
+            <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-gray-900"></div>
           </div>
-        ) : (
-          <>
-            {error && !status && <div className="text-center py-2 text-sm text-red-500">{error}</div>}
-            {status && (
-              <div className="space-y-2">
-                {status.components.map((component) => (
-                  <div key={component.name} className="flex items-center justify-between">
-                    <span className="text-sm">{component.name}</span>
-                    <div className="flex items-center gap-1">
-                      {getStatusIcon(component.status)}
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span
-                              className={`text-xs ${
-                                component.status === "healthy"
-                                  ? "text-green-500"
-                                  : component.status === "degraded"
-                                    ? "text-yellow-500"
-                                    : component.status === "unhealthy"
-                                      ? "text-red-500"
-                                      : "text-gray-500"
-                              }`}
-                            >
-                              {component.status}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{component.message || component.status}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
+        ) : error ? (
+          <Alert variant="destructive">
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : health ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="font-medium">Overall Status</div>
+              <div className="flex items-center gap-2">
+                {getStatusIcon(health.status)}
+                <span>{health.status === "ok" ? "Healthy" : "Issues Detected"}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Services</div>
+
+              <div className="rounded-md border p-2">
+                <div className="flex items-center justify-between">
+                  <div>Database</div>
+                  <div className="flex items-center gap-2">
+                    {getStatusIcon(health.services.database.status)}
+                    <span className="text-sm">{health.services.database.message}</span>
                   </div>
-                ))}
-
-                {/* Debug information section */}
-                {showDebug && status.debug && (
-                  <div className="mt-4 pt-2 border-t text-xs">
-                    <div className="font-semibold mb-1">Debug Information:</div>
-
-                    {status.debug.errors && status.debug.errors.length > 0 && (
-                      <div className="mb-2">
-                        <div className="text-red-500 font-medium">Errors:</div>
-                        <ul className="list-disc pl-4 text-red-500">
-                          {status.debug.errors.map((err, i) => (
-                            <li key={i}>{err}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {status.debug.warnings && status.debug.warnings.length > 0 && (
-                      <div className="mb-2">
-                        <div className="text-yellow-500 font-medium">Warnings:</div>
-                        <ul className="list-disc pl-4 text-yellow-500">
-                          {status.debug.warnings.map((warn, i) => (
-                            <li key={i}>{warn}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {status.debug.info && status.debug.info.length > 0 && (
-                      <div className="mb-2">
-                        <div className="text-blue-500 font-medium">Info:</div>
-                        <ul className="list-disc pl-4 text-blue-500">
-                          {status.debug.info.map((info, i) => (
-                            <li key={i}>{info}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {status.debug.clientError && (
-                      <div className="mb-2">
-                        <div className="text-red-500 font-medium">Client Error:</div>
-                        <div className="text-red-500">{status.debug.clientError}</div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between mt-4 pt-2 border-t">
-                  <div className="text-xs text-muted-foreground">
-                    Last checked: {new Date(status.lastChecked).toLocaleTimeString()}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleRetry}
-                    disabled={isRefreshing}
-                    className="h-7 px-2"
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 mr-1 ${isRefreshing ? "animate-spin" : ""}`} />
-                    Refresh
-                  </Button>
                 </div>
               </div>
-            )}
-          </>
+
+              {/* Add other services as needed */}
+            </div>
+
+            <div className="text-xs text-gray-500">Last updated: {new Date(health.timestamp).toLocaleString()}</div>
+          </div>
+        ) : (
+          <Alert>
+            <AlertTitle>No Data</AlertTitle>
+            <AlertDescription>Unable to retrieve system status.</AlertDescription>
+          </Alert>
         )}
+
+        <div className="mt-4">
+          <Button onClick={fetchHealthStatus} disabled={loading}>
+            {loading ? "Refreshing..." : "Refresh Status"}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )

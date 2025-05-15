@@ -7,93 +7,87 @@ export interface Database {
         Row: {
           id: string
           title: string
-          content: string
+          content: string | null
           category: string
-          user_id: string
+          user_id: string | null
           created_at: string
-          updated_at: string
-          metadata: Json
+          updated_at: string | null
+          metadata: Json | null
+          status: string | null
         }
         Insert: {
-          id: string
+          id?: string
           title: string
-          content: string
+          content?: string | null
           category: string
-          user_id: string
+          user_id?: string | null
           created_at?: string
-          updated_at?: string
-          metadata?: Json
+          updated_at?: string | null
+          metadata?: Json | null
+          status?: string | null
         }
         Update: {
           id?: string
           title?: string
-          content?: string
+          content?: string | null
           category?: string
-          user_id?: string
+          user_id?: string | null
           created_at?: string
-          updated_at?: string
-          metadata?: Json
+          updated_at?: string | null
+          metadata?: Json | null
+          status?: string | null
         }
       }
       feedback: {
         Row: {
           id: string
-          document_id: string
+          document_id: string | null
           content: string
-          correction: string
-          status: string
-          user_id: string
+          correction: string | null
+          status: string | null
+          user_id: string | null
           created_at: string
-          updated_at: string
         }
         Insert: {
-          id: string
-          document_id: string
+          id?: string
+          document_id?: string | null
           content: string
-          correction: string
-          status?: string
-          user_id: string
+          correction?: string | null
+          status?: string | null
+          user_id?: string | null
           created_at?: string
-          updated_at?: string
         }
         Update: {
           id?: string
-          document_id?: string
+          document_id?: string | null
           content?: string
-          correction?: string
-          status?: string
-          user_id?: string
+          correction?: string | null
+          status?: string | null
+          user_id?: string | null
           created_at?: string
-          updated_at?: string
         }
       }
       search_history: {
         Row: {
           id: string
           query: string
-          count: number
           results_count: number
           user_id: string | null
           created_at: string
-          last_searched_at: string
         }
         Insert: {
           id?: string
           query: string
-          count?: number
-          results_count?: number
+          results_count: number
           user_id?: string | null
           created_at?: string
-          last_searched_at?: string
         }
         Update: {
           id?: string
           query?: string
-          count?: number
           results_count?: number
           user_id?: string | null
           created_at?: string
-          last_searched_at?: string
         }
       }
     }
@@ -104,6 +98,9 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
       [_ in never]: never
     }
   }

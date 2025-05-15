@@ -1,6 +1,7 @@
 "use client"
 
-import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function GlobalError({
   error,
@@ -10,27 +11,27 @@ export default function GlobalError({
   reset: () => void
 }) {
   return (
-    <html>
+    <html lang="en">
       <body>
-        <div className="flex flex-col items-center justify-center min-h-screen p-4">
-          <div className="max-w-md text-center space-y-6">
-            <h1 className="text-4xl font-bold">Something went wrong</h1>
-            <p className="text-gray-500">{error.message || "An unexpected error occurred. Please try again later."}</p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
-                onClick={() => reset()}
-                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-              >
-                Try Again
-              </button>
-              <Link
-                href="/"
-                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
-              >
-                Return Home
-              </Link>
-            </div>
-          </div>
+        <div className="flex min-h-screen items-center justify-center p-4">
+          <Card className="mx-auto max-w-md">
+            <CardHeader>
+              <CardTitle>Something went wrong</CardTitle>
+              <CardDescription>A global error occurred in the application.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">
+                <p>Error: {error.message || "Unknown error"}</p>
+                {error.digest && <p className="mt-2 text-xs text-gray-500">Error ID: {error.digest}</p>}
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button variant="outline" onClick={() => (window.location.href = "/")}>
+                Go Home
+              </Button>
+              <Button onClick={() => reset()}>Try Again</Button>
+            </CardFooter>
+          </Card>
         </div>
       </body>
     </html>

@@ -1,47 +1,54 @@
-// This is a server-side alternative for PDF processing
-// It uses a different approach that doesn't require the worker
+// This file contains server-side PDF processing functionality
+import * as pdfjsLib from "pdfjs-dist"
 
-import { createReadStream } from "fs"
+// Initialize PDF.js worker
+// This is a workaround for PDF.js in Node.js environment
+if (typeof window === "undefined") {
+  // Server-side only
+  const pdfjsWorker = require("pdfjs-dist/build/pdf.worker.js")
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
+}
 
-// Simple text extraction function that works on the server
+/**
+ * Extract text from a PDF buffer
+ * @param buffer PDF file as Buffer
+ * @returns Extracted text
+ */
 export async function extractTextFromPDFBuffer(buffer: Buffer): Promise<string> {
   try {
-    // For server-side, we'll use a simpler approach
-    // Convert buffer to a string and extract text using regex
-    // This is not as robust as PDF.js but works for basic PDFs
-    const text = buffer.toString("utf-8")
+    // Load PDF document
+    const data = new Uint8Array(buffer)
+    const loadingTask = pdfjsLib.getDocument({ data })
+    const pdf = await loadingTask.promise
 
-    // Extract text content using regex
-    // This is a simplified approach and won't work for all PDFs
-    const textMatches = text.match(/$$([^)]+)$$/g)
-    if (!textMatches) return ""
+    // Get total number of pages
+    const numPages = pdf.numPages
+    let text = ""
 
-    // Clean up the extracted text
-    return textMatches
-      .map((match) => match.slice(1, -1))
-      .filter((text) => /[a-zA-Z0-9]/.test(text))
-      .join(" ")
+    // Extract text from each page
+    for (let i = 1; i <= numPages; i++) {
+      const page = await pdf.getPage(i)
+      const content = await page.getTextContent()
+      const pageText = content.items.map((item: any) => item.str).join(" ")
+
+      text += pageText + "\n\n"
+    }
+
+    return text
   } catch (error) {
-    console.error("Error extracting text from PDF buffer:", error)
-    return ""
+    console.error("Error extracting text from PDF:", error)
+    throw new Error(`Failed to extract text from PDF: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
-// Function to handle PDF file path
-export async function extractTextFromPDFFile(filePath: string): Promise<string> {
-  try {
-    // Read the file as a buffer
-    const chunks: Buffer[] = []
-    const stream = createReadStream(filePath)
-
-    for await (const chunk of stream) {
-      chunks.push(Buffer.from(chunk))
-    }
-
-    const buffer = Buffer.concat(chunks)
-    return extractTextFromPDFBuffer(buffer)
-  } catch (error) {
-    console.error("Error extracting text from PDF file:", error)
-    return ""
-  }
+/**
+ * Fallback function for environments where PDF.js doesn't work
+ * @param buffer PDF file as Buffer
+ * @returns Mock extracted text
+ */
+export function extractTextFromPDFBufferFallback(buffer: Buffer): string {
+  console.warn("Using PDF extraction fallback - actual content will not be extracted")
+  return `This is placeholder text. The actual PDF content could not be extracted. 
+  This might be due to environment limitations or PDF.js compatibility issues.
+  The PDF size was ${buffer.length} bytes.`
 }

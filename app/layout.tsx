@@ -1,19 +1,15 @@
 import type React from "react"
-import "./globals.css"
+import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { AuthProviderClient } from "@/components/auth-provider-client"
+import { Toaster } from "@/components/ui/toaster"
 
-// Configure font with display: swap for better performance
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap", // This helps with font loading performance
-  preload: true,
-})
+const inter = Inter({ subsets: ["latin"] })
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "UE RAG Dashboard",
-  description: "A dashboard for managing RAG documents and search",
+  description: "Unreal Engine Documentation RAG System",
     generator: 'v0.dev'
 }
 
@@ -25,8 +21,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <AuthProviderClient>{children}</AuthProviderClient>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {children}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getPineconeStats } from "@/lib/ai-sdk"
 import { createClient } from "@supabase/supabase-js"
 
-// Use edge runtime for better serverless compatibility
+// Use Node.js runtime for Pinecone
 export const runtime = "nodejs"
 
 // Create a fresh Supabase client for each request

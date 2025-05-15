@@ -9,17 +9,32 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   experimental: {
-    appDir: true,
-    optimizeCss: false,
-    serverComponentsExternalPackages: ["@pinecone-database/pinecone"],
+    serverComponentsExternalPackages: ["@pinecone-database/pinecone", "pdfjs-dist"],
   },
   webpack: (config, { isServer }) => {
+    // Handle Node.js modules properly
     if (!isServer) {
-      // Don't resolve 'fs' module on the client to prevent this error
       config.resolve.fallback = {
+        ...config.resolve.fallback,
         fs: false,
         path: false,
         crypto: false,
+        stream: false,
+        "node:stream": false,
+        "node:crypto": false,
+        "node:fs": false,
+        "node:path": false,
+        "node:url": false,
+        "node:buffer": false,
+        "node:util": false,
+        "node:assert": false,
+        "node:os": false,
+        "node:http": false,
+        "node:https": false,
+        "node:zlib": false,
+        "node:events": false,
+        "node:net": false,
+        "node:tls": false,
       }
     }
 
