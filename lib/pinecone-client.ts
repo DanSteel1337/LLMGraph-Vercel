@@ -1,109 +1,75 @@
-// This file should only be imported in server components or API routes
-// It uses Node.js specific modules that won't work in the browser
+/**
+ * @deprecated This file is deprecated and will be removed in the next version.
+ * Please use lib/pinecone/client.ts instead for Pinecone client functionality.
+ */
 
-import { Pinecone } from "@pinecone-database/pinecone"
+import {
+  getPineconeClient as getClient,
+  getPineconeIndex as getIndex,
+  getIndexStats as getStats,
+  querySimilarVectors as queryVectors,
+  upsertVectors as upsert,
+  deleteVectors as deleteV,
+  deleteVectorsByFilter as deleteByFilter,
+  getDocumentVectors as getDocVectors,
+} from "./pinecone/client"
 
-// Set runtime to nodejs for any file that imports this
-export const runtime = "nodejs"
-
-let pineconeClient: Pinecone | null = null
-
+// Re-export the functions from the new module with warnings
 export async function getPineconeClient() {
-  // Only create a new client if one doesn't exist
-  if (pineconeClient) return pineconeClient
-
-  if (!process.env.PINECONE_API_KEY) {
-    throw new Error("PINECONE_API_KEY is not defined")
-  }
-
-  pineconeClient = new Pinecone({
-    apiKey: process.env.PINECONE_API_KEY,
-  })
-
-  return pineconeClient
+  console.warn(
+    "getPineconeClient from lib/pinecone-client.ts is deprecated. Please import from lib/pinecone/client.ts instead.",
+  )
+  return getClient()
 }
 
 export async function getPineconeIndex(indexName?: string) {
-  const client = await getPineconeClient()
-  const index = client.Index(indexName || process.env.PINECONE_INDEX_NAME || "")
-
-  if (!index) {
-    throw new Error(`Pinecone index ${indexName || process.env.PINECONE_INDEX_NAME} not found`)
-  }
-
-  return index
+  console.warn(
+    "getPineconeIndex from lib/pinecone-client.ts is deprecated. Please import from lib/pinecone/client.ts instead.",
+  )
+  return getIndex(indexName)
 }
 
 export async function getIndexStats() {
-  const index = await getPineconeIndex()
-  return await index.describeIndexStats()
+  console.warn(
+    "getIndexStats from lib/pinecone-client.ts is deprecated. Please import from lib/pinecone/client.ts instead.",
+  )
+  return getStats()
 }
 
 export async function querySimilarVectors(vector: number[], topK = 5, filter?: any) {
-  try {
-    const index = await getPineconeIndex()
-
-    const results = await index.query({
-      vector,
-      topK,
-      includeMetadata: true,
-      filter,
-    })
-
-    return results
-  } catch (error) {
-    console.error("Error querying Pinecone:", error)
-    throw error
-  }
+  console.warn(
+    "querySimilarVectors from lib/pinecone-client.ts is deprecated. Please import from lib/pinecone/client.ts instead.",
+  )
+  return queryVectors(vector, topK, filter)
 }
 
 export async function upsertVectors(vectors: any[]) {
-  try {
-    const index = await getPineconeIndex()
-    await index.upsert(vectors)
-    return true
-  } catch (error) {
-    console.error("Error upserting vectors to Pinecone:", error)
-    throw error
-  }
+  console.warn(
+    "upsertVectors from lib/pinecone-client.ts is deprecated. Please import from lib/pinecone/client.ts instead.",
+  )
+  return upsert(vectors)
 }
 
 export async function deleteVectors(ids: string[]) {
-  try {
-    const index = await getPineconeIndex()
-    await index.deleteMany(ids)
-    return true
-  } catch (error) {
-    console.error("Error deleting vectors from Pinecone:", error)
-    throw error
-  }
+  console.warn(
+    "deleteVectors from lib/pinecone-client.ts is deprecated. Please import from lib/pinecone/client.ts instead.",
+  )
+  return deleteV(ids)
 }
 
 export async function deleteVectorsByFilter(filter: any) {
-  try {
-    const index = await getPineconeIndex()
-    await index.deleteMany({ filter })
-    return true
-  } catch (error) {
-    console.error("Error deleting vectors by filter from Pinecone:", error)
-    throw error
-  }
+  console.warn(
+    "deleteVectorsByFilter from lib/pinecone-client.ts is deprecated. Please import from lib/pinecone/client.ts instead.",
+  )
+  return deleteByFilter(filter)
 }
 
 export async function getDocumentVectors(documentId: string) {
-  try {
-    const index = await getPineconeIndex()
-
-    const queryResponse = await index.query({
-      filter: { documentId: { $eq: documentId } },
-      includeMetadata: true,
-      includeValues: true,
-      topK: 100,
-    })
-
-    return queryResponse.matches || []
-  } catch (error) {
-    console.error(`Error fetching vectors for document ${documentId}:`, error)
-    throw error
-  }
+  console.warn(
+    "getDocumentVectors from lib/pinecone-client.ts is deprecated. Please import from lib/pinecone/client.ts instead.",
+  )
+  return getDocVectors(documentId)
 }
+
+// Set runtime to nodejs for any file that imports this
+export const runtime = "nodejs"

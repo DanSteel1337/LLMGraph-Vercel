@@ -26,3 +26,7 @@ export function createSafeClient() {
 
 // Type definition for Supabase tables
 export type Tables = Database["public"]["Tables"]
+
+// IMPORTANT: Export the singleton client directly to prevent multiple instances
+const supabase = isClient() ? getSupabaseClient() : null
+export default supabase

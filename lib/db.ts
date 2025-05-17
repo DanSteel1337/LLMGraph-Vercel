@@ -1,20 +1,10 @@
-// Database utility functions
-import { createClient } from "@supabase/supabase-js"
-import type { Database } from "@/types/supabase"
+/**
+ * @deprecated This file is deprecated and will be removed in the next version.
+ * Please use lib/supabase/client.ts for client-side database access
+ * and lib/supabase/server.ts for server-side database access.
+ */
 
-// Use environment variables for Supabase connection
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-
-// Create a singleton instance of the Supabase client
-let supabaseInstance: ReturnType<typeof createClient<Database>> | null = null
-
-export function getSupabaseClient() {
-  if (!supabaseInstance) {
-    supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey)
-  }
-  return supabaseInstance
-}
+import { getSupabaseClient } from "./supabase/client"
 
 // Mock data for development when USE_MOCK_DATA is true
 const MOCK_DOCUMENTS = [
@@ -101,6 +91,8 @@ const MOCK_CATEGORY_DISTRIBUTION = [
 
 // Database operations with mock fallbacks
 export async function getDocuments() {
+  console.warn("getDocuments from lib/db.ts is deprecated. Please use the Supabase client directly.")
+
   if (process.env.USE_MOCK_DATA === "true") {
     return { data: MOCK_DOCUMENTS, error: null }
   }
@@ -115,6 +107,8 @@ export async function getDocuments() {
 }
 
 export async function getDocumentById(id: string) {
+  console.warn("getDocumentById from lib/db.ts is deprecated. Please use the Supabase client directly.")
+
   if (process.env.USE_MOCK_DATA === "true") {
     const document = MOCK_DOCUMENTS.find((doc) => doc.id === id)
     return { data: document || null, error: document ? null : new Error("Document not found") }
@@ -131,6 +125,8 @@ export async function getDocumentById(id: string) {
 }
 
 export async function getDocumentChunks(documentId: string) {
+  console.warn("getDocumentChunks from lib/db.ts is deprecated. Please use the Supabase client directly.")
+
   if (process.env.USE_MOCK_DATA === "true") {
     const chunks = MOCK_DOCUMENT_CHUNKS.filter((chunk) => chunk.document_id === documentId)
     return { data: chunks, error: null }
@@ -146,6 +142,8 @@ export async function getDocumentChunks(documentId: string) {
 }
 
 export async function searchDocuments(query: string) {
+  console.warn("searchDocuments from lib/db.ts is deprecated. Please use lib/ai/hybrid-search.ts instead.")
+
   if (process.env.USE_MOCK_DATA === "true") {
     return { data: MOCK_SEARCH_RESULTS, error: null }
   }
@@ -161,6 +159,8 @@ export async function searchDocuments(query: string) {
 }
 
 export async function createDocument(document: { title: string; content: string; category?: string }) {
+  console.warn("createDocument from lib/db.ts is deprecated. Please use the Supabase client directly.")
+
   if (process.env.USE_MOCK_DATA === "true") {
     const newDocument = {
       id: (MOCK_DOCUMENTS.length + 1).toString(),
@@ -182,6 +182,8 @@ export async function createDocument(document: { title: string; content: string;
 }
 
 export async function updateDocument(id: string, document: { title?: string; content?: string; category?: string }) {
+  console.warn("updateDocument from lib/db.ts is deprecated. Please use the Supabase client directly.")
+
   if (process.env.USE_MOCK_DATA === "true") {
     const index = MOCK_DOCUMENTS.findIndex((doc) => doc.id === id)
     if (index === -1) {
@@ -201,6 +203,8 @@ export async function updateDocument(id: string, document: { title?: string; con
 }
 
 export async function deleteDocument(id: string) {
+  console.warn("deleteDocument from lib/db.ts is deprecated. Please use the Supabase client directly.")
+
   if (process.env.USE_MOCK_DATA === "true") {
     const index = MOCK_DOCUMENTS.findIndex((doc) => doc.id === id)
     if (index === -1) {
@@ -221,6 +225,8 @@ export async function deleteDocument(id: string) {
 
 // Health check function
 export async function checkDatabaseConnection() {
+  console.warn("checkDatabaseConnection from lib/db.ts is deprecated. Please use the Supabase client directly.")
+
   if (process.env.USE_MOCK_DATA === "true") {
     return { status: "ok", message: "Using mock data" }
   }
@@ -242,6 +248,8 @@ export async function checkDatabaseConnection() {
 
 // Get category distribution
 export async function getCategoryDistribution() {
+  console.warn("getCategoryDistribution from lib/db.ts is deprecated. Please use the Supabase client directly.")
+
   if (process.env.USE_MOCK_DATA === "true") {
     return { data: MOCK_CATEGORY_DISTRIBUTION, error: null }
   }
@@ -259,6 +267,8 @@ export async function getCategoryDistribution() {
 
 // Get popular searches
 export async function getPopularSearches() {
+  console.warn("getPopularSearches from lib/db.ts is deprecated. Please use the Supabase client directly.")
+
   if (process.env.USE_MOCK_DATA === "true") {
     return { data: MOCK_POPULAR_SEARCHES, error: null }
   }

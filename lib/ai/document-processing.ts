@@ -1,6 +1,5 @@
 import { embedWithRetry } from "./embeddings"
-import { upsertVectors, upsertVectorsToNamespace } from "../pinecone/client"
-import { deleteVectorsByFilter } from "../pinecone/client"
+import { upsertVectors, deleteVectorsByFilter } from "../pinecone/client"
 
 interface ChunkMetadata {
   documentId: string
@@ -16,140 +15,141 @@ interface ChunkMetadata {
 }
 
 /**
- * Process a document by chunking it and creating vector embeddings
- * @param documentId Unique document ID
+ * Process a document for indexing
+ * @param id Document ID
+ * @param title Document title
  * @param content Document content
- * @param metadata Document metadata
- * @param namespace Optional Pinecone namespace
- * @returns Success status
+ * @param metadata Additional metadata
+ * @returns Processing result
  */
-export async function processDocument(
-  documentId: string,
+export async function processDocument(id: string, title: string, content: string, metadata: Record<string, any> = {}) {
+  try {
+    console.log(`Processing document: ${title} (${id})`)
+
+    // Split content into chunks
+    const chunks = splitIntoChunks(content)
+
+    // Insert document into Pinecone
+    const result = await insertDocumentIntoPinecone(id, title, content, metadata, chunks)
+
+    return { success: true, chunksProcessed: chunks.length }
+  } catch (error) {
+    console.error("Error processing document:", error)
+    throw error
+  }
+}
+
+/**
+ * Split content into chunks with overlap
+ * @param content Document content
+ * @param chunkSize Size of each chunk
+ * @param overlap Overlap between chunks
+ * @returns Array of content chunks
+ */
+export function splitIntoChunks(content: string, chunkSize = 1000, overlap = 200) {
+  const chunks = []
+
+  for (let i = 0; i < content.length; i += chunkSize - overlap) {
+    const chunk = content.substring(i, i + chunkSize)
+    if (chunk.length < 50) continue // Skip very small chunks
+
+    chunks.push({
+      content: chunk,
+      metadata: {
+        chunkIndex: chunks.length,
+      },
+    })
+  }
+
+  return chunks
+}
+
+/**
+ * Insert document into Pinecone
+ * @param id Document ID
+ * @param title Document title
+ * @param content Full document content
+ * @param metadata Additional metadata
+ * @param chunks Content chunks
+ * @returns Insertion result
+ */
+export async function insertDocumentIntoPinecone(
+  id: string,
+  title: string,
   content: string,
   metadata: Record<string, any>,
-  namespace?: string,
-): Promise<boolean> {
+  chunks: { content: string; metadata: Record<string, any> }[],
+) {
   try {
-    // Create chunks with advanced chunking strategy
-    const chunks = createSemanticChunks(content)
+    console.log(`Inserting document into Pinecone: ${title} (${id})`)
 
-    // Process each chunk
+    // Process chunks and generate embeddings
     const vectors = await Promise.all(
       chunks.map(async (chunk, i) => {
-        // Generate embedding for the chunk
-        const embedding = await embedWithRetry(chunk.text)
-
-        // Create chunk metadata
-        const chunkMetadata: ChunkMetadata = {
-          documentId,
-          title: metadata.title || "Untitled Document",
-          category: metadata.category || "Uncategorized",
-          version: metadata.version || "1.0",
-          chunkIndex: i,
-          totalChunks: chunks.length,
-          createdAt: new Date().toISOString(),
-          section: chunk.section,
-          subsection: chunk.subsection,
-          pageNumber: metadata.pageNumber,
-        }
-
+        const embedding = await embedWithRetry(chunk.content)
         return {
-          id: `${documentId}-chunk-${i}`,
+          id: `${id}_chunk_${i}`,
           values: embedding,
           metadata: {
-            ...chunkMetadata,
-            text: chunk.text,
+            ...chunk.metadata,
+            ...metadata,
+            documentId: id,
+            title,
+            text: chunk.content,
+            chunkIndex: i,
           },
         }
       }),
     )
 
-    // Upsert vectors to Pinecone
-    if (namespace) {
-      await upsertVectorsToNamespace(vectors, namespace)
-    } else {
-      await upsertVectors(vectors)
+    // Insert vectors in batches to avoid rate limits
+    const batchSize = 100
+    for (let i = 0; i < vectors.length; i += batchSize) {
+      const batch = vectors.slice(i, i + batchSize)
+      await upsertVectors(batch)
     }
 
-    return true
+    return { success: true, chunksInserted: vectors.length }
   } catch (error) {
-    console.error("Error processing document:", error)
-    return false
+    console.error("Error inserting document into Pinecone:", error)
+    throw error
   }
+}
+
+/**
+ * Delete document from Pinecone
+ * @param id Document ID
+ * @returns Deletion result
+ */
+export async function deleteDocumentFromPinecone(id: string) {
+  try {
+    console.log(`Deleting document from Pinecone: ${id}`)
+
+    // Delete by metadata filter
+    await deleteVectorsByFilter({
+      documentId: id,
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error deleting document from Pinecone:", error)
+    throw error
+  }
+}
+
+/**
+ * Delete document vectors
+ * @param documentId Document ID
+ * @returns Deletion result
+ */
+export async function deleteDocumentVectors(documentId: string) {
+  return deleteDocumentFromPinecone(documentId)
 }
 
 interface TextChunk {
   text: string
   section?: string
   subsection?: string
-}
-
-/**
- * Create semantic chunks from document content
- * This is a more advanced chunking strategy that tries to preserve
- * semantic boundaries like paragraphs, sections, and subsections
- * @param content Document content
- * @returns Array of text chunks with metadata
- */
-function createSemanticChunks(content: string): TextChunk[] {
-  const chunks: TextChunk[] = []
-  const maxChunkSize = 1000
-  const minChunkSize = 100
-
-  // Split content by section headers
-  const sectionPattern = /\n#{1,3}\s+(.+)\n/g
-  const sections = content.split(sectionPattern).filter(Boolean)
-
-  let currentSection = ""
-  let currentSubsection = ""
-
-  for (let i = 0; i < sections.length; i++) {
-    const section = sections[i]
-
-    // Check if this is a section header
-    if (section.trim().length < 100 && i < sections.length - 1) {
-      if (section.startsWith("# ")) {
-        currentSection = section.replace("# ", "").trim()
-        currentSubsection = ""
-      } else if (section.startsWith("## ")) {
-        currentSubsection = section.replace("## ", "").trim()
-      }
-      continue
-    }
-
-    // Split section into paragraphs
-    const paragraphs = section.split(/\n\s*\n/).filter(Boolean)
-
-    let currentChunk = ""
-    const currentChunkMetadata: Omit<TextChunk, "text"> = {
-      section: currentSection,
-      subsection: currentSubsection,
-    }
-
-    for (const paragraph of paragraphs) {
-      // If adding this paragraph would exceed max chunk size, save current chunk and start a new one
-      if (currentChunk.length + paragraph.length > maxChunkSize && currentChunk.length >= minChunkSize) {
-        chunks.push({
-          text: currentChunk.trim(),
-          ...currentChunkMetadata,
-        })
-        currentChunk = ""
-      }
-
-      // Add paragraph to current chunk
-      currentChunk += paragraph + "\n\n"
-    }
-
-    // Add the last chunk if it's not empty
-    if (currentChunk.trim().length >= minChunkSize) {
-      chunks.push({
-        text: currentChunk.trim(),
-        ...currentChunkMetadata,
-      })
-    }
-  }
-
-  return chunks
 }
 
 /**
@@ -180,23 +180,5 @@ export async function updateProcessingStatus(
     })
   } catch (e) {
     console.error("Error updating processing status:", e)
-  }
-}
-
-// Function to delete document from vector store
-export async function deleteDocumentVectors(documentId: string): Promise<boolean> {
-  try {
-    console.log(`Deleting vectors for document ${documentId}`)
-
-    // Delete all vectors with matching documentId in metadata
-    await deleteVectorsByFilter({
-      documentId: { $eq: documentId },
-    })
-
-    console.log(`Successfully deleted vectors for document ${documentId}`)
-    return true
-  } catch (error) {
-    console.error("Error deleting document vectors:", error)
-    return false
   }
 }

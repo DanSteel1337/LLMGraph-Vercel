@@ -17,6 +17,9 @@ export function getRouteSupabaseClient() {
 // Create a direct Supabase client using environment variables
 import { createClient } from "@supabase/supabase-js"
 
+// Export createClient as a named export to fix deployment error
+export { createClient }
+
 export function getDirectSupabaseClient() {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY

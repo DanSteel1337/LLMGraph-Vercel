@@ -57,7 +57,7 @@ export async function querySimilarVectors(vector: number[], topK = 5, filter?: a
   }
 }
 
-// New function: Query with namespace support
+// Query with namespace support
 export async function querySimilarVectorsWithNamespace(vector: number[], namespace: string, topK = 5, filter?: any) {
   try {
     const index = await getPineconeIndex()
@@ -86,7 +86,7 @@ export async function upsertVectors(vectors: any[]) {
   }
 }
 
-// New function: Upsert with namespace support
+// Upsert with namespace support
 export async function upsertVectorsToNamespace(vectors: any[], namespace: string) {
   try {
     const index = await getPineconeIndex()
@@ -112,7 +112,7 @@ export async function deleteVectors(ids: string[]) {
   }
 }
 
-// New function: Delete with namespace support
+// Delete with namespace support
 export async function deleteVectorsFromNamespace(ids: string[], namespace: string) {
   try {
     const index = await getPineconeIndex()
@@ -138,7 +138,7 @@ export async function deleteVectorsByFilter(filter: any) {
   }
 }
 
-// New function: Delete by filter with namespace support
+// Delete by filter with namespace support
 export async function deleteVectorsByFilterFromNamespace(filter: any, namespace: string) {
   try {
     const index = await getPineconeIndex()
@@ -171,7 +171,7 @@ export async function getDocumentVectors(documentId: string) {
   }
 }
 
-// New function: Get document vectors from namespace
+// Get document vectors from namespace
 export async function getDocumentVectorsFromNamespace(documentId: string, namespace: string) {
   try {
     const index = await getPineconeIndex()
@@ -191,7 +191,7 @@ export async function getDocumentVectorsFromNamespace(documentId: string, namesp
   }
 }
 
-// New function: Get namespace statistics
+// Get namespace statistics
 export async function getNamespaceStats() {
   try {
     const index = await getPineconeIndex()
@@ -203,7 +203,7 @@ export async function getNamespaceStats() {
   }
 }
 
-// New function: Get detailed index statistics
+// Get detailed index statistics
 export async function getDetailedIndexStats() {
   try {
     const index = await getPineconeIndex()
@@ -235,3 +235,6 @@ export async function getDetailedIndexStats() {
     return null
   }
 }
+
+// Add the missing export to fix deployment error
+export const getPineconeStats = getIndexStats

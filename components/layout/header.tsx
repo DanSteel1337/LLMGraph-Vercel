@@ -1,7 +1,6 @@
 import Link from "next/link"
 import { MainNav } from "@/components/navigation/main-nav"
-import { Button } from "@/components/ui/button"
-import { UserCircle } from "lucide-react"
+import { UserProfile } from "@/lib/auth-simple"
 
 export function Header() {
   return (
@@ -12,10 +11,7 @@ export function Header() {
         </Link>
         <MainNav />
         <div className="ml-auto flex items-center space-x-4">
-          <Button variant="outline" size="sm" className="flex items-center gap-2">
-            <UserCircle className="h-4 w-4" />
-            <span className="hidden md:block">Account</span>
-          </Button>
+          <UserProfile />
         </div>
       </div>
     </header>

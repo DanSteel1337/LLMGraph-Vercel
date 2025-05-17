@@ -1,362 +1,214 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {
-  type ColumnDef,
-  type ColumnFiltersState,
-  type SortingState,
-  type VisibilityState,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
-} from "@tanstack/react-table"
-import { ArrowUpDown, Check, ChevronDown, MoreHorizontal, X } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { toast } from "@/components/ui/use-toast"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { fetchFeedback, updateFeedbackStatus } from "@/lib/api"
-import { FeedbackDetailDialog } from "./feedback-detail-dialog"
+import { AlertCircle } from "lucide-react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import FeedbackDetailDialog from "./feedback-detail-dialog"
 
-export type Feedback = {
+export interface Feedback {
   id: string
-  documentId: string
-  documentTitle: string
   content: string
-  correction: string
-  status: "pending" | "approved" | "rejected"
-  submittedAt: string
-  submittedBy: string
+  correction: string | null
+  status: string
+  created_at: string
+  document_id: string | null
+  submittedBy?: string
+  submittedAt?: string
+  documentTitle?: string
 }
 
 export function FeedbackManagement() {
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
-  const [rowSelection, setRowSelection] = useState({})
   const [feedback, setFeedback] = useState<Feedback[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null)
-  const [activeTab, setActiveTab] = useState<"all" | "pending" | "approved" | "rejected">("all")
+  const [tableExists, setTableExists] = useState(true)
+  const [createTableMessage, setCreateTableMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    const getFeedback = async () => {
+    const fetchFeedback = async () => {
       try {
-        const data = await fetchFeedback()
-        setFeedback(data)
-        setIsLoading(false)
-      } catch (error) {
-        console.error("Failed to fetch feedback:", error)
-        setIsLoading(false)
-        toast({
-          title: "Error",
-          description: "Failed to load feedback. Please try again.",
-          variant: "destructive",
-        })
+        setLoading(true)
+        const response = await fetch("/api/feedback")
+        const data = await response.json()
+
+        if (data.message && data.message.includes("does not exist")) {
+          setTableExists(false)
+          setCreateTableMessage(data.message)
+          setFeedback([])
+        } else if (data.error) {
+          setError(data.error)
+          setFeedback([])
+        } else {
+          setFeedback(data.feedback || [])
+          setTableExists(true)
+        }
+      } catch (err) {
+        setError("Failed to fetch feedback")
+        console.error("Error fetching feedback:", err)
+      } finally {
+        setLoading(false)
       }
     }
 
-    getFeedback()
+    fetchFeedback()
   }, [])
 
-  const handleStatusChange = async (id: string, status: "approved" | "rejected") => {
+  const handleOpenDetail = (item: Feedback) => {
+    setSelectedFeedback(item)
+  }
+
+  const handleCloseDetail = () => {
+    setSelectedFeedback(null)
+  }
+
+  const handleStatusChange = async (status: "approved" | "rejected") => {
+    if (!selectedFeedback) return
+
     try {
-      await updateFeedbackStatus(id, status)
-      setFeedback(feedback.map((item) => (item.id === id ? { ...item, status } : item)))
-      toast({
-        title: `Feedback ${status}`,
-        description: `The feedback has been ${status} successfully.`,
+      const response = await fetch(`/api/feedback/${selectedFeedback.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
       })
-    } catch (error) {
-      console.error(`Failed to ${status} feedback:`, error)
-      toast({
-        title: "Error",
-        description: `Failed to ${status} feedback. Please try again.`,
-        variant: "destructive",
-      })
+
+      if (response.ok) {
+        // Update the feedback list
+        setFeedback((prev) => prev.map((item) => (item.id === selectedFeedback.id ? { ...item, status } : item)))
+        // Close the dialog
+        setSelectedFeedback(null)
+      } else {
+        const data = await response.json()
+        setError(data.error || "Failed to update feedback status")
+      }
+    } catch (err) {
+      setError("Failed to update feedback status")
+      console.error("Error updating feedback:", err)
     }
   }
 
-  const filteredFeedback = activeTab === "all" ? feedback : feedback.filter((item) => item.status === activeTab)
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return "bg-yellow-500"
+      case "resolved":
+      case "approved":
+        return "bg-green-500"
+      case "rejected":
+        return "bg-red-500"
+      default:
+        return "bg-gray-500"
+    }
+  }
 
-  const columns: ColumnDef<Feedback>[] = [
-    {
-      accessorKey: "documentTitle",
-      header: ({ column }) => {
-        return (
-          <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-            Document
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
-      cell: ({ row }) => <div className="font-medium">{row.getValue("documentTitle")}</div>,
-    },
-    {
-      accessorKey: "content",
-      header: "Original Content",
-      cell: ({ row }) => {
-        const content = row.getValue("content") as string
-        return <div className="max-w-[300px] truncate">{content}</div>
-      },
-    },
-    {
-      accessorKey: "correction",
-      header: "Suggested Correction",
-      cell: ({ row }) => {
-        const correction = row.getValue("correction") as string
-        return <div className="max-w-[300px] truncate">{correction}</div>
-      },
-    },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => {
-        const status = row.getValue("status") as string
-        return (
-          <Badge variant={status === "approved" ? "default" : status === "pending" ? "outline" : "destructive"}>
-            {status}
-          </Badge>
-        )
-      },
-    },
-    {
-      accessorKey: "submittedAt",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="justify-end w-full"
-          >
-            Submitted
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
-      cell: ({ row }) => {
-        const date = new Date(row.getValue("submittedAt"))
-        return <div className="text-right">{date.toLocaleDateString()}</div>
-      },
-    },
-    {
-      id: "actions",
-      enableHiding: false,
-      cell: ({ row }) => {
-        const feedback = row.original
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>User Feedback</CardTitle>
+          <CardDescription>Loading feedback data...</CardDescription>
+        </CardHeader>
+      </Card>
+    )
+  }
 
-        return (
-          <div className="flex items-center justify-end gap-2">
-            {feedback.status === "pending" && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleStatusChange(feedback.id, "approved")}
-                  className="text-green-500 hover:text-green-700 hover:bg-green-100"
-                >
-                  <Check className="h-4 w-4" />
-                  <span className="sr-only">Approve</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleStatusChange(feedback.id, "rejected")}
-                  className="text-red-500 hover:text-red-700 hover:bg-red-100"
-                >
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">Reject</span>
-                </Button>
-              </>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => setSelectedFeedback(feedback)}>View details</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigator.clipboard.writeText(feedback.id)}>
-                  Copy feedback ID
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )
-      },
-    },
-  ]
+  if (!tableExists) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>User Feedback</CardTitle>
+          <CardDescription>Manage user feedback on search results</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Database Table Missing</AlertTitle>
+            <AlertDescription>
+              {createTableMessage || "The feedback table does not exist in your database."}
+              <div className="mt-4">
+                <p className="text-sm font-medium">Run this SQL in your Supabase SQL Editor:</p>
+                <pre className="mt-2 rounded bg-slate-950 p-4 text-xs text-white overflow-x-auto">
+                  {`CREATE TABLE public.feedback (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  document_id UUID REFERENCES public.documents(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  correction TEXT,
+  status TEXT DEFAULT 'pending',
+  user_id UUID,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);`}
+                </pre>
+              </div>
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    )
+  }
 
-  const table = useReactTable({
-    data: filteredFeedback,
-    columns,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
-    state: {
-      sorting,
-      columnFilters,
-      columnVisibility,
-      rowSelection,
-    },
-  })
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>User Feedback</CardTitle>
+          <CardDescription>Error loading feedback</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    )
+  }
 
-  return (
-    <div className="space-y-4">
-      <Tabs defaultValue="all" onValueChange={(value) => setActiveTab(value as any)}>
-        <div className="flex items-center justify-between">
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="pending">Pending</TabsTrigger>
-            <TabsTrigger value="approved">Approved</TabsTrigger>
-            <TabsTrigger value="rejected">Rejected</TabsTrigger>
-          </TabsList>
-
-          <div className="flex items-center gap-2">
-            <Input
-              placeholder="Filter feedback..."
-              value={(table.getColumn("documentTitle")?.getFilterValue() as string) ?? ""}
-              onChange={(event) => table.getColumn("documentTitle")?.setFilterValue(event.target.value)}
-              className="max-w-sm"
-            />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="ml-auto">
-                  Columns <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {table
-                  .getAllColumns()
-                  .filter((column) => column.getCanHide())
-                  .map((column) => {
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        className="capitalize"
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                      >
-                        {column.id}
-                      </DropdownMenuCheckboxItem>
-                    )
-                  })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        <TabsContent value="all" className="mt-4">
-          <FeedbackTable table={table} isLoading={isLoading} />
-        </TabsContent>
-        <TabsContent value="pending" className="mt-4">
-          <FeedbackTable table={table} isLoading={isLoading} />
-        </TabsContent>
-        <TabsContent value="approved" className="mt-4">
-          <FeedbackTable table={table} isLoading={isLoading} />
-        </TabsContent>
-        <TabsContent value="rejected" className="mt-4">
-          <FeedbackTable table={table} isLoading={isLoading} />
-        </TabsContent>
-      </Tabs>
-
-      {selectedFeedback && (
-        <FeedbackDetailDialog
-          feedback={selectedFeedback}
-          open={!!selectedFeedback}
-          onOpenChange={(open) => {
-            if (!open) setSelectedFeedback(null)
-          }}
-          onStatusChange={(status) => {
-            handleStatusChange(selectedFeedback.id, status)
-            setSelectedFeedback((prev) => (prev ? { ...prev, status } : null))
-          }}
-        />
-      )}
-    </div>
-  )
-}
-
-interface FeedbackTableProps {
-  table: any
-  isLoading: boolean
-}
-
-function FeedbackTable({ table, isLoading }: FeedbackTableProps) {
   return (
     <Card>
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup: any) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header: any) => {
-                  return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                    </TableHead>
-                  )
-                })}
-              </TableRow>
+      <CardHeader>
+        <CardTitle>User Feedback</CardTitle>
+        <CardDescription>Manage user feedback on search results</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {feedback.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">No feedback submissions yet</div>
+        ) : (
+          <div className="space-y-4">
+            {feedback.map((item) => (
+              <div key={item.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="font-medium truncate flex-1">{item.content.substring(0, 100)}...</div>
+                  <Badge className={`ml-2 ${getStatusColor(item.status)}`}>{item.status || "Pending"}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="text-sm text-gray-500">{new Date(item.created_at).toLocaleString()}</div>
+                  <Button variant="outline" size="sm" onClick={() => handleOpenDetail(item)}>
+                    View Details
+                  </Button>
+                </div>
+              </div>
             ))}
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
-                  Loading feedback...
-                </TableCell>
-              </TableRow>
-            ) : table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row: any) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-                  {row.getVisibleCells().map((cell: any) => (
-                    <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
-                  No feedback found.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <div className="flex items-center justify-end space-x-2 p-4">
-        <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
-          Previous
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-          Next
-        </Button>
-      </div>
+          </div>
+        )}
+
+        {selectedFeedback && (
+          <FeedbackDetailDialog
+            feedback={selectedFeedback}
+            open={!!selectedFeedback}
+            onClose={handleCloseDetail}
+            onStatusChange={handleStatusChange}
+          />
+        )}
+      </CardContent>
     </Card>
   )
 }
+
+// Also add a default export for flexibility
+export default FeedbackManagement

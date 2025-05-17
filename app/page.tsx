@@ -12,7 +12,7 @@ import SearchInterface from "@/components/search/search-interface"
 import { DocumentManagement } from "@/components/documents/document-management"
 import { DocumentUploadForm } from "@/components/upload/document-upload-form"
 import { FeedbackManagement } from "@/components/feedback/feedback-management"
-import SystemStatus from "@/components/dashboard/system-status" // Fixed import
+import SystemStatus from "@/components/dashboard/system-status"
 import { SettingsForm } from "@/components/settings/settings-form"
 import { AdvancedAnalytics } from "@/components/analytics/advanced-analytics"
 

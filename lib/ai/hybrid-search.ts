@@ -75,7 +75,7 @@ function extractKeywords(query: string): string[] {
  * @param query Search query
  * @returns Highlighted text with <mark> tags
  */
-function highlightText(text: string, query: string): string {
+export function highlightText(text: string, query: string): string {
   if (!text) return ""
 
   // Escape special regex characters in the query
@@ -180,6 +180,53 @@ export async function hybridSearch(
 }
 
 /**
+ * Simple vector search without reranking (for backward compatibility)
+ * @param query Search query
+ * @param filters Optional filters
+ * @param topK Number of results to return
+ * @returns Search results
+ */
+export async function searchSimilarDocuments(
+  query: string,
+  filters?: Record<string, any>,
+  topK = 5,
+): Promise<SearchResult[]> {
+  console.warn("searchSimilarDocuments is deprecated. Please use hybridSearch instead for better results.")
+  try {
+    console.log(`Searching for documents similar to: "${query}"`)
+
+    // Generate embedding for the query
+    const embedding = await embedWithRetry(query)
+
+    // Prepare filter if provided
+    const filterObj = filters ? { metadata: filters } : undefined
+
+    // Query Pinecone
+    const results = await querySimilarVectors(embedding, topK, filterObj)
+
+    console.log(`Found ${results.matches?.length || 0} matches in Pinecone`)
+
+    // Process and return results
+    return (
+      results.matches?.map((match) => ({
+        id: match.id,
+        score: match.score || 0,
+        title: match.metadata?.title || "Untitled Document",
+        content: match.metadata?.text || "",
+        category: match.metadata?.category || "Uncategorized",
+        version: match.metadata?.version || "Unknown",
+        documentId: match.metadata?.documentId || match.id,
+        highlights: [highlightText(match.metadata?.text as string, query)],
+        matchType: "vector",
+      })) || []
+    )
+  } catch (error) {
+    console.error("Error searching documents:", error)
+    throw error
+  }
+}
+
+/**
  * Track search query for analytics
  * @param query Search query
  * @param resultCount Number of results
@@ -205,3 +252,6 @@ export async function trackSearchQuery(query: string, resultCount: number, userI
     // Non-blocking - don't throw
   }
 }
+
+// Add the missing export to fix deployment error
+export const searchDocuments = hybridSearch

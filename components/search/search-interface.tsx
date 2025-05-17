@@ -1,155 +1,189 @@
-"use client"
+"\"use client"
 
 import type React from "react"
 
 import { useState } from "react"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, SearchIcon } from "lucide-react"
-import { hybridSearch, trackSearchQuery } from "@/lib/ai/hybrid-search"
-import SearchResults from "@/components/search/search-results"
-import SearchFilters from "@/components/search/search-filters"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { Loader2, Search, Info } from "lucide-react"
+import SearchResults from "./search-results"
+import { useToast } from "@/components/ui/use-toast"
 
+// Define the search result type
+export interface SearchResult {
+  id: string
+  title: string
+  content: string
+  score: number
+  metadata: {
+    source?: string
+    page?: number
+    category?: string
+    version?: string
+    [key: string]: any
+  }
+}
+
+// Export the SearchInterface component as default
 export default function SearchInterface() {
   const [query, setQuery] = useState("")
-  const [searchResults, setSearchResults] = useState<any[]>([])
-  const [answer, setAnswer] = useState<string | null>(null)
-  const [isSearching, setIsSearching] = useState(false)
+  const [results, setResults] = useState<SearchResult[]>([])
+  const [loading, setLoading] = useState(false)
+  const [searchType, setSearchType] = useState("hybrid")
   const [error, setError] = useState<string | null>(null)
-  const [filters, setFilters] = useState<Record<string, any>>({})
+  const { toast } = useToast()
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
-
+  const handleSearch = async () => {
     if (!query.trim()) return
 
+    setLoading(true)
+    setError(null)
+
     try {
-      setIsSearching(true)
-      setError(null)
+      // Track the search for analytics
+      fetch("/api/analytics/track-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, searchType }),
+      }).catch(console.error) // Non-blocking
 
-      // Record start time for performance tracking
-      const startTime = performance.now()
+      // Perform the search
+      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&type=${searchType}`)
 
-      // Perform hybrid search
-      const results = await hybridSearch(query, filters)
-
-      // Calculate query time
-      const queryTime = performance.now() - startTime
-
-      // Track search for analytics
-      await trackSearchQuery(query, results.length, undefined, Math.round(queryTime))
-
-      setSearchResults(results)
-
-      // If we have results, generate an answer
-      if (results.length > 0) {
-        try {
-          const answerResponse = await fetch("/api/generate-answer", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              query,
-              context: results
-                .slice(0, 3)
-                .map((r) => r.content)
-                .join("\n\n"),
-            }),
-          })
-
-          if (answerResponse.ok) {
-            const answerData = await answerResponse.json()
-            setAnswer(answerData.answer)
-          } else {
-            console.error("Failed to generate answer")
-            setAnswer(null)
-          }
-        } catch (answerError) {
-          console.error("Error generating answer:", answerError)
-          setAnswer(null)
-        }
-      } else {
-        setAnswer(null)
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.statusText}`)
       }
-    } catch (error) {
-      console.error("Search error:", error)
-      setError("An error occurred while searching. Please try again.")
-      setSearchResults([])
-      setAnswer(null)
+
+      const data = await response.json()
+      setResults(data.results || [])
+    } catch (err) {
+      console.error("Search error:", err)
+      setError(err instanceof Error ? err.message : "An unknown error occurred")
+      toast({
+        title: "Search Error",
+        description: err instanceof Error ? err.message : "Failed to perform search",
+        variant: "destructive",
+      })
+      setResults([])
     } finally {
-      setIsSearching(false)
+      setLoading(false)
     }
   }
 
-  const handleFilterChange = (newFilters: Record<string, any>) => {
-    setFilters(newFilters)
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSearch()
+    }
+  }
+
+  const submitFeedback = async (resultId: string, isPositive: boolean) => {
+    try {
+      await fetch("/api/feedback/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query,
+          resultId,
+          isPositive,
+          searchType,
+        }),
+      })
+
+      toast({
+        title: "Feedback Submitted",
+        description: "Thank you for your feedback!",
+        variant: "default",
+      })
+    } catch (err) {
+      console.error("Feedback error:", err)
+      toast({
+        title: "Feedback Error",
+        description: "Failed to submit feedback",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
-    <div className="w-full space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Search Documentation</CardTitle>
-          <CardDescription>Search through Unreal Engine documentation using natural language</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSearch} className="flex w-full items-center space-x-2">
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>Search Documentation</CardTitle>
+        <CardDescription>Find answers in the Unreal Engine documentation</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex space-x-2">
             <Input
-              type="text"
-              placeholder="Ask a question about Unreal Engine..."
+              placeholder="What are you looking for?"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
               className="flex-1"
             />
-            <Button type="submit" disabled={isSearching || !query.trim()}>
-              {isSearching ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Searching
-                </>
-              ) : (
-                <>
-                  <SearchIcon className="mr-2 h-4 w-4" />
-                  Search
-                </>
-              )}
+            <Button onClick={handleSearch} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
+              Search
             </Button>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="md:col-span-1">
-          <SearchFilters onFilterChange={handleFilterChange} />
-        </div>
+          <Tabs defaultValue="hybrid" value={searchType} onValueChange={setSearchType}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="hybrid">Hybrid</TabsTrigger>
+              <TabsTrigger value="vector">Semantic</TabsTrigger>
+              <TabsTrigger value="keyword">Keyword</TabsTrigger>
+            </TabsList>
+            <TabsContent value="hybrid">
+              <p className="text-sm text-muted-foreground">
+                Combines semantic understanding with keyword matching for the best results.
+              </p>
+            </TabsContent>
+            <TabsContent value="vector">
+              <p className="text-sm text-muted-foreground">
+                Uses AI to understand the meaning behind your query, not just the words.
+              </p>
+            </TabsContent>
+            <TabsContent value="keyword">
+              <p className="text-sm text-muted-foreground">
+                Traditional search that matches the exact words in your query.
+              </p>
+            </TabsContent>
+          </Tabs>
 
-        <div className="md:col-span-3">
           {error && (
-            <div className="bg-destructive/10 p-4 rounded-md text-destructive mb-4">
-              <p>{error}</p>
+            <div className="bg-destructive/10 text-destructive p-3 rounded-md flex items-start">
+              <Info className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium">Search Error</p>
+                <p className="text-sm">{error}</p>
+              </div>
             </div>
           )}
 
-          {isSearching ? (
-            <Card>
-              <CardContent className="flex justify-center items-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-2">Searching documentation...</span>
-              </CardContent>
-            </Card>
-          ) : searchResults.length > 0 ? (
-            <SearchResults results={searchResults} answer={answer} query={query} />
-          ) : query && !isSearching ? (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <p className="text-muted-foreground">No results found. Try a different search term.</p>
-              </CardContent>
-            </Card>
-          ) : null}
+          {results.length > 0 && (
+            <div className="pt-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium">Results</h3>
+                <Badge variant="outline">{results.length} found</Badge>
+              </div>
+
+              <SearchResults results={results} query={query} onFeedback={submitFeedback} />
+            </div>
+          )}
+
+          {!loading && query && results.length === 0 && !error && (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No results found for "{query}"</p>
+              <p className="text-sm text-muted-foreground mt-2">Try using different keywords or search terms</p>
+            </div>
+          )}
         </div>
-      </div>
-    </div>
+      </CardContent>
+      <CardFooter className="flex justify-between">
+        <p className="text-xs text-muted-foreground">Powered by Pinecone and OpenAI</p>
+      </CardFooter>
+    </Card>
   )
 }

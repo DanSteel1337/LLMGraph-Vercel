@@ -1,69 +1,67 @@
-import { openai } from "@ai-sdk/openai"
-
-export const runtime = "nodejs"
-
-export async function generateEmbedding(text: string) {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is not defined")
-  }
-
+/**
+ * Generate embeddings for text using OpenAI
+ * @param text Text to embed
+ * @returns Embedding vector
+ */
+export async function generateEmbeddings(text: string): Promise<number[]> {
   try {
-    // Use the embeddings method directly from the openai client
-    const response = await openai.embeddings.create({
-      model: "text-embedding-3-small",
-      input: text,
+    // Dynamic import to avoid issues with server/client
+    const { embed } = await import("ai")
+    const { openai } = await import("@ai-sdk/openai")
+
+    const { embedding } = await embed({
+      model: openai.embedding("text-embedding-3-small"),
+      value: text,
     })
 
-    return response.data[0].embedding
+    return embedding
   } catch (error) {
-    console.error("Error generating embedding:", error)
+    console.error("Error generating embeddings:", error)
     throw error
   }
 }
 
-export async function generateEmbeddings(texts: string[]) {
-  return Promise.all(texts.map((text) => generateEmbedding(text)))
-}
-
-// Add the missing embedWithRetry function
-export async function embedWithRetry(text: string, maxRetries = 3) {
+/**
+ * Generate embeddings with retry logic
+ * @param text Text to embed
+ * @param maxRetries Maximum number of retries
+ * @returns Embedding vector
+ */
+export async function embedWithRetry(text: string, maxRetries = 3): Promise<number[]> {
   let retries = 0
-  let lastError
+  let lastError: any = null
 
   while (retries < maxRetries) {
     try {
-      return await generateEmbedding(text)
+      return await generateEmbeddings(text)
     } catch (error) {
       lastError = error
       retries++
-      console.warn(`Embedding generation failed, attempt ${retries}/${maxRetries}`, error)
-
-      // Wait before retrying (exponential backoff)
-      if (retries < maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, retries - 1)))
-      }
+      console.warn(`Embedding generation failed, retry ${retries}/${maxRetries}`)
+      // Exponential backoff
+      await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, retries)))
     }
   }
 
-  console.error(`Failed to generate embedding after ${maxRetries} attempts`)
+  console.error("All embedding retries failed:", lastError)
   throw lastError
 }
 
-// Add the missing highlightText function that's imported in search.ts
+/**
+ * Highlight text with search query
+ * @param text Text to highlight
+ * @param query Search query
+ * @returns Highlighted text with <mark> tags
+ */
 export function highlightText(text: string, query: string): string {
   if (!text) return ""
 
-  try {
-    // Escape special regex characters in the query
-    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  // Escape special regex characters in the query
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
-    // Create a regex that matches the query
-    const regex = new RegExp(`(${escapedQuery})`, "gi")
+  // Create a regex that matches the query
+  const pattern = new RegExp(`(${escapedQuery})`, "gi")
 
-    // Replace matches with highlighted version
-    return text.replace(regex, "<mark>$1</mark>")
-  } catch (error) {
-    console.error("Error highlighting text:", error)
-    return text
-  }
+  // Replace matches with highlighted version
+  return text.replace(pattern, "<mark>$1</mark>")
 }

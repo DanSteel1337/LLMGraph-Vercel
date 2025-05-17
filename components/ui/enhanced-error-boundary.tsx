@@ -1,25 +1,23 @@
 "use client"
 
 import { Component, type ErrorInfo, type ReactNode } from "react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertTriangle } from "lucide-react"
+import { AlertCircle, RefreshCw } from "lucide-react"
 
-interface ErrorBoundaryProps {
+interface Props {
   children: ReactNode
-  fallback?: ReactNode
   componentName?: string
-  onReset?: () => void
 }
 
-interface ErrorBoundaryState {
+interface State {
   hasError: boolean
   error: Error | null
   errorInfo: ErrorInfo | null
 }
 
-export class EnhancedErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
+export class EnhancedErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
     super(props)
     this.state = {
       hasError: false,
@@ -28,7 +26,7 @@ export class EnhancedErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
     }
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error): State {
     return {
       hasError: true,
       error,
@@ -37,79 +35,45 @@ export class EnhancedErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    this.setState({ errorInfo })
-    console.error(`Error in ${this.props.componentName || "component"}:`, error, errorInfo)
+    this.setState({
+      error,
+      errorInfo,
+    })
 
-    // Could add error reporting service here
-    // reportError(error, errorInfo, this.props.componentName)
+    // Log error to an error reporting service
+    console.error("Error caught by ErrorBoundary:", error, errorInfo)
   }
 
-  handleReset = () => {
+  handleReset = (): void => {
     this.setState({
       hasError: false,
       error: null,
       errorInfo: null,
     })
-
-    if (this.props.onReset) {
-      this.props.onReset()
-    }
   }
 
   render(): ReactNode {
-    if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback
-      }
+    const { hasError, error } = this.state
+    const { children, componentName } = this.props
 
+    if (hasError) {
       return (
-        <Card className="mx-auto max-w-md border-red-200 bg-red-50">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-              <CardTitle className="text-red-700">Something went wrong</CardTitle>
-            </div>
-            <CardDescription className="text-red-600">
-              {this.props.componentName
-                ? `An error occurred in the ${this.props.componentName} component.`
-                : "An error occurred in this component."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md bg-red-100 p-4 text-sm text-red-800">
-              <p className="font-medium">Error: {this.state.error?.message || "Unknown error"}</p>
-              {process.env.NODE_ENV === "development" && this.state.errorInfo && (
-                <details className="mt-2">
-                  <summary className="cursor-pointer font-medium">Stack trace</summary>
-                  <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-xs">
-                    {this.state.errorInfo.componentStack}
-                  </pre>
-                </details>
-              )}
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-between gap-2">
-            <Button
-              variant="outline"
-              className="border-red-200 bg-white text-red-700 hover:bg-red-50"
-              onClick={this.handleReset}
-            >
+        <Alert variant="destructive" className="my-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>
+            Error in {componentName || "component"}: {error?.name || "Unknown Error"}
+          </AlertTitle>
+          <AlertDescription className="mt-2">
+            <p className="mb-2">{error?.message || "An unexpected error occurred"}</p>
+            <Button variant="outline" size="sm" className="mt-2 flex items-center" onClick={this.handleReset}>
+              <RefreshCw className="mr-2 h-4 w-4" />
               Try Again
             </Button>
-            <Button
-              variant="outline"
-              className="border-red-200 bg-white text-red-700 hover:bg-red-50"
-              onClick={() => window.location.reload()}
-            >
-              Reload Page
-            </Button>
-          </CardFooter>
-        </Card>
+          </AlertDescription>
+        </Alert>
       )
     }
 
-    return this.props.children
+    return children
   }
 }
-
-export default EnhancedErrorBoundary

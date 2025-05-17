@@ -16,6 +16,7 @@ interface HealthCheckResponse {
   timestamp: string
   services: {
     database: ServiceStatus
+    pinecone?: ServiceStatus
     // Add other services as needed
   }
 }
@@ -30,14 +31,20 @@ export default function SystemStatus() {
     setError(null)
 
     try {
-      const response = await fetch("/api/health")
+      // Use the correct endpoint parameter (type instead of operation)
+      const response = await fetch("/api/system?type=health")
 
       if (!response.ok) {
-        throw new Error(`Health check failed: ${response.status} ${response.statusText}`)
+        const errorText = await response.text()
+        console.error("Health check response:", response.status, errorText)
+        throw new Error(`Health check failed: ${response.status}${errorText ? ` - ${errorText}` : ""}`)
       }
 
       const data = await response.json()
-      setHealth(data)
+
+      // Handle different response formats
+      const healthData = data.data || data
+      setHealth(healthData)
     } catch (err) {
       console.error("Error fetching health status:", err)
       setError(err instanceof Error ? err.message : "Unknown error")
@@ -90,17 +97,29 @@ export default function SystemStatus() {
             <div className="space-y-2">
               <div className="text-sm font-medium">Services</div>
 
-              <div className="rounded-md border p-2">
-                <div className="flex items-center justify-between">
-                  <div>Database</div>
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(health.services.database.status)}
-                    <span className="text-sm">{health.services.database.message}</span>
+              {health.services.database && (
+                <div className="rounded-md border p-2">
+                  <div className="flex items-center justify-between">
+                    <div>Database</div>
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(health.services.database.status)}
+                      <span className="text-sm">{health.services.database.message}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Add other services as needed */}
+              {health.services.pinecone && (
+                <div className="rounded-md border p-2">
+                  <div className="flex items-center justify-between">
+                    <div>Pinecone</div>
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(health.services.pinecone.status)}
+                      <span className="text-sm">{health.services.pinecone.message}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="text-xs text-gray-500">Last updated: {new Date(health.timestamp).toLocaleString()}</div>

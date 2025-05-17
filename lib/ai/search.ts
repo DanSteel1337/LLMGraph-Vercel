@@ -1,38 +1,21 @@
-import { embedWithRetry } from "./embeddings"
-import { querySimilarVectors } from "../pinecone/client"
-import { highlightText } from "./embeddings"
+/**
+ * @deprecated This file is deprecated and will be removed in the next version.
+ * Please use lib/ai/hybrid-search.ts instead for search functionality.
+ */
 
-// Search for similar documents
+import { searchSimilarDocuments as search, highlightText as highlight } from "./hybrid-search"
+
+// Re-export the functions from the new module with warnings
 export async function searchSimilarDocuments(query: string, filters?: Record<string, any>, topK = 5): Promise<any[]> {
-  try {
-    console.log(`Searching for documents similar to: "${query}"`)
+  console.warn(
+    "searchSimilarDocuments from lib/ai/search.ts is deprecated. Please use hybridSearch from lib/ai/hybrid-search.ts instead.",
+  )
+  return search(query, filters, topK)
+}
 
-    // Generate embedding for the query
-    const embedding = await embedWithRetry(query)
-
-    // Prepare filter if provided
-    const filterObj = filters ? { metadata: filters } : undefined
-
-    // Query Pinecone
-    const results = await querySimilarVectors(embedding, topK, filterObj)
-
-    console.log(`Found ${results.matches?.length || 0} matches in Pinecone`)
-
-    // Process and return results
-    return (
-      results.matches?.map((match) => ({
-        id: match.id,
-        score: match.score,
-        title: match.metadata?.title || "Untitled Document",
-        content: match.metadata?.text || "",
-        category: match.metadata?.category || "Uncategorized",
-        version: match.metadata?.version || "Unknown",
-        documentId: match.metadata?.documentId || match.id,
-        highlights: [highlightText(match.metadata?.text as string, query)],
-      })) || []
-    )
-  } catch (error) {
-    console.error("Error searching documents:", error)
-    throw error
-  }
+export function highlightText(text: string, query: string): string {
+  console.warn(
+    "highlightText from lib/ai/search.ts is deprecated. Please use highlightText from lib/ai/hybrid-search.ts instead.",
+  )
+  return highlight(text, query)
 }
