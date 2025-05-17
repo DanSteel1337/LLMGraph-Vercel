@@ -38,6 +38,12 @@ const nextConfig = {
       }
     }
 
+    // Fix for pdfjs-dist worker
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "pdfjs-dist/build/pdf.worker.js": "pdfjs-dist/build/pdf.worker.mjs",
+    }
+
     return config
   },
   // Disable image optimization during development to avoid potential issues
