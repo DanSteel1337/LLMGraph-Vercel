@@ -1,8 +1,11 @@
+"use client"
+
+import { Suspense } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
-export default function NotFound() {
+function NotFoundContent() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="mx-auto max-w-md">
@@ -22,5 +25,13 @@ export default function NotFound() {
         </CardFooter>
       </Card>
     </div>
+  )
+}
+
+export default function NotFound() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <NotFoundContent />
+    </Suspense>
   )
 }
