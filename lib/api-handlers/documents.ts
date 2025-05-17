@@ -6,6 +6,8 @@ import { processDocument } from "@/lib/document-processor"
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
+// Import the DOM polyfill to ensure it's applied
+import "@/lib/utils/dom-polyfill"
 
 // Create a Supabase client with proper error handling
 function getSupabaseClient() {

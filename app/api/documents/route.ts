@@ -10,6 +10,19 @@ import {
   getDocumentVectors,
 } from "@/lib/api-handlers/documents"
 
+// Polyfill for DOMMatrix if needed in server environment
+if (typeof globalThis.DOMMatrix === "undefined") {
+  // Simple no-op implementation for server-side
+  class DOMMatrixPolyfill {
+    constructor(transform?: string) {
+      // No-op constructor
+    }
+  }
+
+  // @ts-ignore - Adding to global
+  globalThis.DOMMatrix = DOMMatrixPolyfill
+}
+
 export const runtime = "nodejs" // Use Node.js runtime for Supabase
 
 // Main documents endpoint
