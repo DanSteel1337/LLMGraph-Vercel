@@ -10,19 +10,6 @@ import {
   getDocumentVectors,
 } from "@/lib/api-handlers/documents"
 
-// Polyfill for DOMMatrix if needed in server environment
-if (typeof globalThis.DOMMatrix === "undefined") {
-  // Simple no-op implementation for server-side
-  class DOMMatrixPolyfill {
-    constructor(transform?: string) {
-      // No-op constructor
-    }
-  }
-
-  // @ts-ignore - Adding to global
-  globalThis.DOMMatrix = DOMMatrixPolyfill
-}
-
 export const runtime = "nodejs" // Use Node.js runtime for Supabase
 
 // Main documents endpoint
@@ -42,12 +29,7 @@ export async function GET(req: NextRequest) {
         const { data: chunksData, error: chunksError } = await getDocumentChunks(id)
 
         if (chunksError) {
-          return NextResponse.json(
-            {
-              error: chunksError instanceof Error ? chunksError.message : String(chunksError),
-            },
-            { status: 500 },
-          )
+          return NextResponse.json({ error: chunksError.message }, { status: 500 })
         }
 
         return NextResponse.json({ chunks: chunksData })
@@ -60,12 +42,7 @@ export async function GET(req: NextRequest) {
         const { data: vectorsData, error: vectorsError } = await getDocumentVectors(id)
 
         if (vectorsError) {
-          return NextResponse.json(
-            {
-              error: vectorsError instanceof Error ? vectorsError.message : String(vectorsError),
-            },
-            { status: 500 },
-          )
+          return NextResponse.json({ error: vectorsError.message }, { status: 500 })
         }
 
         return NextResponse.json({ vectors: vectorsData })
@@ -76,12 +53,7 @@ export async function GET(req: NextRequest) {
           const { data, error } = await getDocumentById(id)
 
           if (error) {
-            return NextResponse.json(
-              {
-                error: error instanceof Error ? error.message : String(error),
-              },
-              { status: 500 },
-            )
+            return NextResponse.json({ error: error.message }, { status: 500 })
           }
 
           return NextResponse.json({ document: data })
@@ -89,12 +61,7 @@ export async function GET(req: NextRequest) {
           const { data, error } = await getDocuments()
 
           if (error) {
-            return NextResponse.json(
-              {
-                error: error instanceof Error ? error.message : String(error),
-              },
-              { status: 500 },
-            )
+            return NextResponse.json({ error: error.message }, { status: 500 })
           }
 
           return NextResponse.json({ documents: data })
@@ -102,13 +69,7 @@ export async function GET(req: NextRequest) {
     }
   } catch (error) {
     console.error("Error in GET /api/documents:", error)
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Unknown error",
-        details: error instanceof Error ? error.stack : undefined,
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 })
   }
 }
 
@@ -138,24 +99,13 @@ export async function POST(req: NextRequest) {
     })
 
     if (error) {
-      return NextResponse.json(
-        {
-          error: error instanceof Error ? error.message : String(error),
-        },
-        { status: 500 },
-      )
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ document: data }, { status: 201 })
   } catch (error) {
     console.error("Error in POST /api/documents:", error)
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Unknown error",
-        details: error instanceof Error ? error.stack : undefined,
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 })
   }
 }
 
@@ -173,24 +123,13 @@ export async function PUT(req: NextRequest) {
     const { data, error } = await updateDocument(id, body)
 
     if (error) {
-      return NextResponse.json(
-        {
-          error: error instanceof Error ? error.message : String(error),
-        },
-        { status: 500 },
-      )
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ document: data })
   } catch (error) {
     console.error("Error in PUT /api/documents:", error)
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Unknown error",
-        details: error instanceof Error ? error.stack : undefined,
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 })
   }
 }
 
@@ -207,23 +146,12 @@ export async function DELETE(req: NextRequest) {
     const { error, success } = await deleteDocument(id)
 
     if (error) {
-      return NextResponse.json(
-        {
-          error: error instanceof Error ? error.message : String(error),
-        },
-        { status: 500 },
-      )
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ success })
   } catch (error) {
     console.error("Error in DELETE /api/documents:", error)
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Unknown error",
-        details: error instanceof Error ? error.stack : undefined,
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 })
   }
 }
