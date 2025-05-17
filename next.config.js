@@ -10,6 +10,7 @@ const nextConfig = {
   },
   experimental: {
     serverComponentsExternalPackages: ["@pinecone-database/pinecone", "pdfjs-dist"],
+    esmExternals: "loose", // This is key for handling ESM packages
   },
   webpack: (config, { isServer }) => {
     // Handle Node.js modules properly
@@ -38,11 +39,16 @@ const nextConfig = {
       }
     }
 
-    // Fix for pdfjs-dist worker
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      "pdfjs-dist/build/pdf.worker.js": "pdfjs-dist/build/pdf.worker.mjs",
-    }
+    // Don't attempt to bundle the pdf.worker.mjs file
+    // Instead, we'll load it dynamically at runtime
+    config.module.rules.push({
+      test: /pdf\.worker\.(min\.)?js|pdf\.worker\.(min\.)?mjs/,
+      type: "javascript/auto",
+      loader: "file-loader",
+      options: {
+        name: "static/[name].[hash].[ext]",
+      },
+    })
 
     return config
   },

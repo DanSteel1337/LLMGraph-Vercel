@@ -2,14 +2,31 @@
  * Document API Handlers
  * Centralizes all document-related API functionality
  */
-import { createClient } from "@/lib/supabase/server"
 import { processDocument } from "@/lib/document-processor"
 import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/supabase"
+
+// Create a Supabase client with proper error handling
+function getSupabaseClient() {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl) {
+    throw new Error("Supabase URL is not defined. Please check your environment variables.")
+  }
+
+  if (!supabaseKey) {
+    throw new Error("Supabase key is not defined. Please check your environment variables.")
+  }
+
+  return createClient<Database>(supabaseUrl, supabaseKey)
+}
 
 // Get all documents
 export async function getDocuments() {
   try {
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase.from("documents").select("*").order("created_at", { ascending: false })
 
     if (error) {
@@ -27,7 +44,7 @@ export async function getDocuments() {
 // Get a single document by ID
 export async function getDocumentById(id: string) {
   try {
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase.from("documents").select("*").eq("id", id).single()
 
     if (error) {
@@ -45,7 +62,7 @@ export async function getDocumentById(id: string) {
 // Create a new document
 export async function createDocument(document: any) {
   try {
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase.from("documents").insert(document).select().single()
 
     if (error) {
@@ -63,7 +80,7 @@ export async function createDocument(document: any) {
 // Update a document
 export async function updateDocument(id: string, updates: any) {
   try {
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase.from("documents").update(updates).eq("id", id).select().single()
 
     if (error) {
@@ -81,7 +98,7 @@ export async function updateDocument(id: string, updates: any) {
 // Delete a document
 export async function deleteDocument(id: string) {
   try {
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
     const { error } = await supabase.from("documents").delete().eq("id", id)
 
     if (error) {
@@ -123,7 +140,7 @@ export async function processDocumentHandler(req: NextRequest) {
     })
 
     // Update document status in Supabase
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
     await supabase
       .from("documents")
       .update({
@@ -158,7 +175,7 @@ export async function processDocumentHandler(req: NextRequest) {
 // Get document chunks
 export async function getDocumentChunks(id: string) {
   try {
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase
       .from("chunks")
       .select("*")

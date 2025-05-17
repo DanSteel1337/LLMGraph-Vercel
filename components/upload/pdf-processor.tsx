@@ -15,9 +15,11 @@ export function usePdfProcessor() {
         // Dynamic import to avoid server-side issues
         pdfjsLib = await import("pdfjs-dist")
 
-        // Set up the worker
-        const pdfjsWorker = await import("pdfjs-dist/build/pdf.worker.entry")
-        pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
+        // Set up the worker using dynamic import
+        // This is the key fix - using dynamic import for the worker
+        const workerUrl = new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url).toString()
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
 
         setIsReady(true)
       } catch (error) {
