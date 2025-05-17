@@ -1,6 +1,9 @@
 // This file contains server-side PDF processing functionality
 import * as pdfjsLib from "pdfjs-dist"
 
+// Import the PDF.js polyfills for Node.js environment
+import "@/lib/pdf-node-polyfill"
+
 // Initialize PDF.js worker
 // This is a workaround for PDF.js in Node.js environment
 if (typeof window === "undefined") {

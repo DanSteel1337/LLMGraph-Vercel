@@ -10,6 +10,9 @@ import {
   getDocumentVectors,
 } from "@/lib/api-handlers/documents"
 
+// Import the PDF.js polyfills for Node.js environment
+import "@/lib/pdf-node-polyfill"
+
 export const runtime = "nodejs" // Use Node.js runtime for Supabase
 
 // Main documents endpoint
