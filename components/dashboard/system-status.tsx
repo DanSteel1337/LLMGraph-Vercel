@@ -21,7 +21,7 @@ interface HealthCheckResponse {
   }
 }
 
-export default function SystemStatus() {
+function SystemStatus() {
   const [health, setHealth] = useState<HealthCheckResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -140,3 +140,9 @@ export default function SystemStatus() {
     </Card>
   )
 }
+
+// Add named export
+export { SystemStatus }
+
+// Keep default export for backward compatibility
+export default SystemStatus

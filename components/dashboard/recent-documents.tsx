@@ -6,8 +6,42 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Eye, FileText } from "lucide-react"
-import { getDocuments } from "@/lib/db"
-import type { Document } from "@/lib/db"
+import { createSafeClient } from "@/lib/supabase/client"
+
+// Define Document type locally to avoid dependency on deprecated lib/db.ts
+type Document = {
+  id: string
+  title: string
+  content?: string
+  created_at: string
+  category: string
+  metadata?: any
+}
+
+// Mock data for development when USE_MOCK_DATA is true
+const MOCK_DOCUMENTS = [
+  {
+    id: "1",
+    title: "Getting Started with Unreal Engine",
+    content: "This guide will help you get started with Unreal Engine...",
+    created_at: new Date().toISOString(),
+    category: "Beginner",
+  },
+  {
+    id: "2",
+    title: "Blueprint Basics",
+    content: "Learn the fundamentals of Blueprint visual scripting...",
+    created_at: new Date().toISOString(),
+    category: "Programming",
+  },
+  {
+    id: "3",
+    title: "Material System Overview",
+    content: "Understanding the material system in Unreal Engine...",
+    created_at: new Date().toISOString(),
+    category: "Graphics",
+  },
+]
 
 interface RecentDocumentsProps {
   onViewDocument?: (id: string) => void
@@ -25,8 +59,38 @@ export function RecentDocuments({ onViewDocument, limit = 5 }: RecentDocumentsPr
         setIsLoading(true)
         setError(null)
 
-        const data = await getDocuments()
-        setDocuments(data.slice(0, limit)) // Get only the most recent documents
+        // Check if we should use mock data
+        if (process.env.USE_MOCK_DATA === "true") {
+          // Use mock data and sort by created_at in descending order
+          const sortedMockDocs = [...MOCK_DOCUMENTS].sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+          )
+          setDocuments(sortedMockDocs.slice(0, limit))
+          return
+        }
+
+        // Use Supabase client directly
+        const supabase = createSafeClient()
+        if (!supabase) {
+          throw new Error("Supabase client not available")
+        }
+
+        const { data, error } = await supabase
+          .from("documents")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(limit)
+
+        if (error) {
+          throw error
+        }
+
+        if (!data) {
+          setDocuments([])
+          return
+        }
+
+        setDocuments(data)
       } catch (error) {
         console.error("Error fetching recent documents:", error)
         setError("Failed to fetch recent documents")

@@ -1,150 +1,179 @@
-"use client"
-import { useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { EnhancedErrorBoundary } from "@/components/ui/enhanced-error-boundary"
-import { Suspense } from "react"
-import { Loader2 } from "lucide-react"
-import { NavigationProvider, useNavigation } from "@/contexts/navigation-context"
-
-// Import components
-import SearchInterface from "@/components/search/search-interface"
+import { DashboardStats } from "@/components/dashboard/dashboard-stats"
+import { CategoryDistribution } from "@/components/dashboard/category-distribution"
+import { SearchTrends } from "@/components/dashboard/search-trends"
+import { PopularSearches } from "@/components/dashboard/popular-searches"
+import { RecentDocuments } from "@/components/dashboard/recent-documents"
+import { SystemStatus } from "@/components/dashboard/system-status"
 import { DocumentManagement } from "@/components/documents/document-management"
-import { DocumentUploadForm } from "@/components/upload/document-upload-form"
+import { SearchInterface } from "@/components/search/search-interface"
 import { FeedbackManagement } from "@/components/feedback/feedback-management"
-import SystemStatus from "@/components/dashboard/system-status"
 import { SettingsForm } from "@/components/settings/settings-form"
-import { AdvancedAnalytics } from "@/components/analytics/advanced-analytics"
+import { DocumentUploadFormWrapper } from "@/components/upload/document-upload-form-wrapper"
+import { ProtectedPageWrapper } from "@/components/protected-page-wrapper"
+import { EnvVarChecker } from "@/components/dashboard/env-var-checker"
 
-// Loading fallback component
-function LoadingFallback({ message = "Loading..." }: { message?: string }) {
+export default function DashboardPage() {
   return (
-    <div className="flex justify-center items-center h-64">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      <span className="ml-2">{message}</span>
-    </div>
-  )
-}
+    <ProtectedPageWrapper>
+      <div className="container mx-auto p-4 space-y-6">
+        <h1 className="text-3xl font-bold">UE-RAG Dashboard</h1>
 
-// Main dashboard component
-function Dashboard() {
-  const { activeTab, setActiveTab } = useNavigation()
+        <EnvVarChecker />
 
-  return (
-    <div className="container mx-auto p-4 space-y-6">
-      <h1 className="text-3xl font-bold">Unreal Engine Documentation</h1>
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="grid grid-cols-6 mb-8">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="documents">Documents</TabsTrigger>
+            <TabsTrigger value="search">Search</TabsTrigger>
+            <TabsTrigger value="feedback">Feedback</TabsTrigger>
+            <TabsTrigger value="system">System</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+          </TabsList>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-3 md:grid-cols-6 mb-4">
-          <TabsTrigger value="search">Search</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="upload">Upload</TabsTrigger>
-          <TabsTrigger value="feedback">Feedback</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="search" className="animate-in fade-in-50 duration-300">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <EnhancedErrorBoundary componentName="SearchInterface">
-                <Suspense fallback={<LoadingFallback message="Loading search interface..." />}>
-                  <SearchInterface />
-                </Suspense>
-              </EnhancedErrorBoundary>
-            </div>
-            <div className="lg:col-span-1">
-              <EnhancedErrorBoundary componentName="SystemStatus">
-                <Suspense fallback={<LoadingFallback message="Loading system status..." />}>
-                  <SystemStatus />
-                </Suspense>
-              </EnhancedErrorBoundary>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="documents" className="animate-in fade-in-50 duration-300">
-          <EnhancedErrorBoundary componentName="DocumentManagement">
-            <Suspense fallback={<LoadingFallback message="Loading document management..." />}>
-              <DocumentManagement />
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            <Suspense fallback={<div>Loading stats...</div>}>
+              <DashboardStats />
             </Suspense>
-          </EnhancedErrorBoundary>
-        </TabsContent>
 
-        <TabsContent value="upload" className="animate-in fade-in-50 duration-300">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <EnhancedErrorBoundary componentName="DocumentUploadForm">
-              <Suspense fallback={<LoadingFallback message="Loading upload form..." />}>
-                <DocumentUploadForm />
-              </Suspense>
-            </EnhancedErrorBoundary>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Category Distribution</CardTitle>
+                  <CardDescription>Document distribution by category</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Suspense fallback={<div>Loading chart...</div>}>
+                    <CategoryDistribution />
+                  </Suspense>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Search Trends</CardTitle>
+                  <CardDescription>Search volume over time</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Suspense fallback={<div>Loading chart...</div>}>
+                    <SearchTrends />
+                  </Suspense>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Popular Searches</CardTitle>
+                  <CardDescription>Most frequent search terms</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Suspense fallback={<div>Loading searches...</div>}>
+                    <PopularSearches />
+                  </Suspense>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Documents</CardTitle>
+                  <CardDescription>Recently added documents</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Suspense fallback={<div>Loading documents...</div>}>
+                    <RecentDocuments />
+                  </Suspense>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Documents Tab */}
+          <TabsContent value="documents" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Upload Documents</CardTitle>
+                <CardDescription>Add new documents to the knowledge base</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DocumentUploadFormWrapper />
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Upload Instructions</CardTitle>
-                <CardDescription>How to prepare your documents for upload</CardDescription>
+                <CardTitle>Document Management</CardTitle>
+                <CardDescription>View, edit, and delete documents</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-medium">Supported File Types</h3>
-                    <p className="text-sm text-muted-foreground">PDF, Markdown, and Text files are supported.</p>
-                  </div>
-                  <div>
-                    <h3 className="font-medium">Document Structure</h3>
-                    <p className="text-sm text-muted-foreground">
-                      For best results, ensure your documents have clear headings and sections. This helps our system
-                      better understand and index your content.
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className="font-medium">Metadata</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Adding proper metadata like category and version improves search accuracy.
-                    </p>
-                  </div>
-                </div>
+                <Suspense fallback={<div>Loading documents...</div>}>
+                  <DocumentManagement />
+                </Suspense>
               </CardContent>
             </Card>
-          </div>
-        </TabsContent>
+          </TabsContent>
 
-        <TabsContent value="feedback" className="animate-in fade-in-50 duration-300">
-          <EnhancedErrorBoundary componentName="FeedbackManagement">
-            <Suspense fallback={<LoadingFallback message="Loading feedback management..." />}>
-              <FeedbackManagement />
-            </Suspense>
-          </EnhancedErrorBoundary>
-        </TabsContent>
+          {/* Search Tab */}
+          <TabsContent value="search" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Search Interface</CardTitle>
+                <CardDescription>Search the knowledge base</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SearchInterface />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <TabsContent value="analytics" className="animate-in fade-in-50 duration-300">
-          <EnhancedErrorBoundary componentName="AdvancedAnalytics">
-            <Suspense fallback={<LoadingFallback message="Loading analytics..." />}>
-              <AdvancedAnalytics />
-            </Suspense>
-          </EnhancedErrorBoundary>
-        </TabsContent>
+          {/* Feedback Tab */}
+          <TabsContent value="feedback" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Feedback Management</CardTitle>
+                <CardDescription>View and respond to user feedback</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Suspense fallback={<div>Loading feedback...</div>}>
+                  <FeedbackManagement />
+                </Suspense>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <TabsContent value="settings" className="animate-in fade-in-50 duration-300">
-          <EnhancedErrorBoundary componentName="SettingsForm">
-            <Suspense fallback={<LoadingFallback message="Loading settings..." />}>
-              <SettingsForm />
-            </Suspense>
-          </EnhancedErrorBoundary>
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
-}
+          {/* System Tab */}
+          <TabsContent value="system" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>System Status</CardTitle>
+                <CardDescription>Monitor system health and performance</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Suspense fallback={<div>Loading system status...</div>}>
+                  <SystemStatus />
+                </Suspense>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-// Wrap the dashboard with the navigation provider
-export default function Page() {
-  const searchParams = useSearchParams()
-  const tabParam = searchParams.get("tab")
-
-  return (
-    <NavigationProvider initialTab={tabParam || "search"}>
-      <Dashboard />
-    </NavigationProvider>
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>System Settings</CardTitle>
+                <CardDescription>Configure system parameters</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SettingsForm />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </ProtectedPageWrapper>
   )
 }

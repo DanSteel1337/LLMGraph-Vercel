@@ -41,7 +41,11 @@ function UploadFormSkeleton() {
   )
 }
 
-export default function DocumentUploadFormWrapper() {
+// Change from default export to named export to match import expectations
+export { DocumentUploadFormWrapper }
+
+// The actual component
+function DocumentUploadFormWrapper() {
   return (
     <Suspense fallback={<UploadFormSkeleton />}>
       <DocumentUploadForm />

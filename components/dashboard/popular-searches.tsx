@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getPopularSearches } from "@/lib/db"
 import { Skeleton } from "@/components/ui/skeleton"
+import { createSafeClient } from "@/lib/supabase/client"
 
 interface PopularSearchesProps {
   limit?: number
@@ -18,11 +18,59 @@ export function PopularSearches({ limit = 5 }: PopularSearchesProps) {
       try {
         setIsLoading(true)
         setError(null)
-        const data = await getPopularSearches()
-        setSearches(data.slice(0, limit))
+
+        // Use mock data if environment variable is set
+        if (process.env.USE_MOCK_DATA === "true") {
+          const mockData = [
+            { query: "blueprints", count: 120 },
+            { query: "materials", count: 95 },
+            { query: "animation", count: 87 },
+            { query: "lighting", count: 76 },
+            { query: "physics", count: 65 },
+          ]
+          setSearches(mockData.slice(0, limit))
+          return
+        }
+
+        // Use Supabase client directly instead of deprecated function
+        const supabase = createSafeClient()
+        if (!supabase) {
+          throw new Error("Supabase client not available")
+        }
+
+        // Get the most popular searches
+        const { data, error } = await supabase
+          .from("search_history")
+          .select("query")
+          .order("created_at", { ascending: false })
+          .limit(100) // Get more than we need for processing
+
+        if (error) {
+          throw error
+        }
+
+        if (!data || !Array.isArray(data)) {
+          throw new Error("Invalid data format received from Supabase")
+        }
+
+        // Count occurrences of each query
+        const queryCounts: Record<string, number> = {}
+        data.forEach((item) => {
+          const query = item.query.toLowerCase().trim()
+          queryCounts[query] = (queryCounts[query] || 0) + 1
+        })
+
+        // Convert to array and sort by count
+        const popularSearches = Object.entries(queryCounts)
+          .map(([query, count]) => ({ query, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, limit)
+
+        setSearches(popularSearches)
       } catch (error) {
         console.error("Error fetching popular searches:", error)
         setError("Failed to fetch popular searches")
+        setSearches([])
       } finally {
         setIsLoading(false)
       }

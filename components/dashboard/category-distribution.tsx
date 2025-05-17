@@ -1,131 +1,141 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
 import { AlertCircle } from "lucide-react"
-import { ErrorBoundary } from "@/components/error-boundary"
-import { getCategoryDistribution } from "@/lib/db"
 
-interface CategoryData {
+// Define the data structure
+type CategoryData = {
   name: string
-  count: number
-  percentage: number
-  color?: string
+  value: number
+  color: string
 }
 
+// Colors for the chart
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8", "#82CA9D", "#A4DE6C"]
+
 export function CategoryDistribution() {
-  const [categories, setCategories] = useState<CategoryData[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [data, setData] = useState<CategoryData[]>([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchCategoryDistribution = async () => {
+    const fetchData = async () => {
       try {
-        setIsLoading(true)
+        setLoading(true)
         setError(null)
 
-        const data = await getCategoryDistribution()
+        // Check if we should use mock data
+        const useMockData = process.env.USE_MOCK_DATA === "true"
 
-        // Assign colors to categories
-        const categoriesWithColors = data.map((category, index) => ({
-          ...category,
-          color: `var(--chart-${(index % 7) + 1}, hsl(${index * 40}, 70%, 50%))`,
-        }))
+        if (useMockData) {
+          // Use mock data
+          const mockData: CategoryData[] = [
+            { name: "Blueprints", value: 35, color: COLORS[0] },
+            { name: "C++ API", value: 25, color: COLORS[1] },
+            { name: "Materials", value: 15, color: COLORS[2] },
+            { name: "Physics", value: 10, color: COLORS[3] },
+            { name: "Animation", value: 8, color: COLORS[4] },
+            { name: "Rendering", value: 7, color: COLORS[5] },
+          ]
 
-        setCategories(categoriesWithColors)
-      } catch (error) {
-        console.error("Error in category distribution component:", error)
-        setError("Failed to fetch category distribution")
+          // Simulate network delay
+          await new Promise((resolve) => setTimeout(resolve, 1000))
+          setData(mockData)
+        } else {
+          // Use the Supabase URL from environment variables
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+
+          if (!supabaseUrl) {
+            throw new Error("Supabase URL is not configured")
+          }
+
+          // Fetch real data from API
+          const response = await fetch("/api/analytics/category-distribution")
+
+          if (!response.ok) {
+            throw new Error(`Failed to fetch data: ${response.status} ${response.statusText}`)
+          }
+
+          const result = await response.json()
+
+          // Map the API response to our data structure
+          const categoryData: CategoryData[] = result.data.map((item: any, index: number) => ({
+            name: item.category,
+            value: item.count,
+            color: COLORS[index % COLORS.length],
+          }))
+
+          setData(categoryData)
+        }
+      } catch (err) {
+        console.error("Error fetching category distribution data:", err)
+        setError(err instanceof Error ? err.message : "Failed to load category distribution data")
       } finally {
-        setIsLoading(false)
+        setLoading(false)
       }
     }
 
-    fetchCategoryDistribution()
+    fetchData()
   }, [])
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-[300px] w-full" />
-      </div>
-    )
-  }
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="flex flex-col space-y-3">
+          <Skeleton className="h-[250px] w-full rounded-md" />
+        </div>
+      )
+    }
 
-  if (categories.length === 0) {
+    if (error) {
+      return (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )
+    }
+
+    if (data.length === 0) {
+      return <p className="text-center text-muted-foreground">No category data available</p>
+    }
+
     return (
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>No document categories found</AlertDescription>
-      </Alert>
+      <ResponsiveContainer width="100%" height={250}>
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            labelLine={false}
+            outerRadius={80}
+            fill="#8884d8"
+            dataKey="value"
+            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.color} />
+            ))}
+          </Pie>
+          <Tooltip formatter={(value) => [`${value} documents`, "Count"]} />
+          <Legend />
+        </PieChart>
+      </ResponsiveContainer>
     )
   }
 
   return (
-    <ErrorBoundary>
-      <div className="space-y-6">
-        {error && (
-          <Alert variant="destructive" className="mb-2">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        <div className="relative pt-6">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-3xl font-bold">{categories.reduce((sum, cat) => sum + cat.count, 0)}</div>
-              <div className="text-sm text-muted-foreground">Total Documents</div>
-            </div>
-          </div>
-          <svg viewBox="0 0 100 100" className="w-full h-auto max-w-[250px] mx-auto">
-            <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--border))" strokeWidth="10" />
-
-            {/* Create pie chart segments */}
-            {categories.map((category, index) => {
-              // Calculate the segment position
-              const cumulativePercentage = categories.slice(0, index).reduce((sum, cat) => sum + cat.percentage, 0)
-
-              // Convert percentage to radians
-              const startAngle = (cumulativePercentage / 100) * 2 * Math.PI - Math.PI / 2
-              const endAngle = ((cumulativePercentage + category.percentage) / 100) * 2 * Math.PI - Math.PI / 2
-
-              // Calculate the SVG arc path
-              const x1 = 50 + 40 * Math.cos(startAngle)
-              const y1 = 50 + 40 * Math.sin(startAngle)
-              const x2 = 50 + 40 * Math.cos(endAngle)
-              const y2 = 50 + 40 * Math.sin(endAngle)
-
-              // Determine if the arc should be drawn as a large arc
-              const largeArcFlag = category.percentage > 50 ? 1 : 0
-
-              return (
-                <path
-                  key={category.name}
-                  d={`M 50 50 L ${x1} ${y1} A 40 40 0 ${largeArcFlag} 1 ${x2} ${y2} Z`}
-                  fill={category.color || `hsl(${index * 40}, 70%, 50%)`}
-                />
-              )
-            })}
-          </svg>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {categories.map((category) => (
-            <div key={category.name} className="flex flex-col">
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: category.color }} />
-                <span className="text-sm font-medium truncate">{category.name}</span>
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-xs text-muted-foreground">{category.count} docs</span>
-                <span className="text-xs font-medium">{category.percentage}%</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </ErrorBoundary>
+    <Card>
+      <CardHeader>
+        <CardTitle>Document Categories</CardTitle>
+        <CardDescription>Distribution of documents by category</CardDescription>
+      </CardHeader>
+      <CardContent>{renderContent()}</CardContent>
+    </Card>
   )
 }

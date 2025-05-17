@@ -89,6 +89,16 @@ const MOCK_CATEGORY_DISTRIBUTION = [
   { category: "Physics", count: 23 },
 ]
 
+// Define Document type
+export type Document = {
+  id: string
+  title: string
+  content: string
+  created_at: string
+  category: string
+  metadata?: any
+}
+
 // Database operations with mock fallbacks
 export async function getDocuments() {
   console.warn("getDocuments from lib/db.ts is deprecated. Please use the Supabase client directly.")

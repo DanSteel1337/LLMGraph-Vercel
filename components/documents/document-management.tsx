@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
-import { fetchDocuments, deleteDocument } from "@/lib/api"
+import { createSafeClient } from "@/lib/supabase/client"
 import { DocumentEditDialog } from "./document-edit-dialog"
 
 export type Document = {
@@ -43,6 +43,55 @@ export type Document = {
   size: number
 }
 
+// Mock data for development when USE_MOCK_DATA is true
+const MOCK_DOCUMENTS = [
+  {
+    id: "1",
+    title: "Getting Started with Unreal Engine",
+    category: "Beginner",
+    version: "5.4",
+    uploadedAt: new Date().toISOString(),
+    status: "processed" as const,
+    size: 1024 * 1024 * 2.5, // 2.5 MB
+  },
+  {
+    id: "2",
+    title: "Blueprint Basics",
+    category: "Programming",
+    version: "5.4",
+    uploadedAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+    status: "processed" as const,
+    size: 1024 * 1024 * 1.2, // 1.2 MB
+  },
+  {
+    id: "3",
+    title: "Material System Overview",
+    category: "Graphics",
+    version: "5.3",
+    uploadedAt: new Date(Date.now() - 86400000 * 2).toISOString(), // 2 days ago
+    status: "processed" as const,
+    size: 1024 * 1024 * 3.7, // 3.7 MB
+  },
+  {
+    id: "4",
+    title: "Animation Blueprint Guide",
+    category: "Animation",
+    version: "5.4",
+    uploadedAt: new Date(Date.now() - 86400000 * 3).toISOString(), // 3 days ago
+    status: "processing" as const,
+    size: 1024 * 1024 * 5.1, // 5.1 MB
+  },
+  {
+    id: "5",
+    title: "Physics Simulation Tutorial",
+    category: "Physics",
+    version: "5.2",
+    uploadedAt: new Date(Date.now() - 86400000 * 5).toISOString(), // 5 days ago
+    status: "failed" as const,
+    size: 1024 * 1024 * 1.8, // 1.8 MB
+  },
+]
+
 export function DocumentManagement() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -51,30 +100,89 @@ export function DocumentManagement() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [editingDocument, setEditingDocument] = useState<Document | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const getDocuments = async () => {
+    const fetchDocuments = async () => {
       try {
-        const data = await fetchDocuments()
-        setDocuments(data)
-        setIsLoading(false)
+        setIsLoading(true)
+        setError(null)
+
+        // Use mock data if environment variable is set
+        if (process.env.USE_MOCK_DATA === "true") {
+          setDocuments(MOCK_DOCUMENTS)
+          return
+        }
+
+        // Use Supabase client directly instead of deprecated function
+        const supabase = createSafeClient()
+        if (!supabase) {
+          throw new Error("Supabase client not available")
+        }
+
+        const { data, error } = await supabase.from("documents").select("*").order("created_at", { ascending: false })
+
+        if (error) {
+          throw error
+        }
+
+        if (!data) {
+          setDocuments([])
+          return
+        }
+
+        // Transform the data to match the Document type
+        const formattedDocuments: Document[] = data.map((doc) => ({
+          id: doc.id,
+          title: doc.title,
+          category: doc.category || "Uncategorized",
+          version: doc.metadata?.version || "Unknown",
+          uploadedAt: doc.created_at,
+          status: doc.status || "processed",
+          size: doc.metadata?.size || 0,
+        }))
+
+        setDocuments(formattedDocuments)
       } catch (error) {
         console.error("Failed to fetch documents:", error)
-        setIsLoading(false)
+        setError("Failed to load documents. Please try again.")
         toast({
           title: "Error",
           description: "Failed to load documents. Please try again.",
           variant: "destructive",
         })
+      } finally {
+        setIsLoading(false)
       }
     }
 
-    getDocuments()
+    fetchDocuments()
   }, [])
 
   const handleDeleteDocument = async (id: string) => {
     try {
-      await deleteDocument(id)
+      // Use Supabase client directly instead of deprecated function
+      if (process.env.USE_MOCK_DATA === "true") {
+        // Just remove from local state for mock data
+        setDocuments(documents.filter((doc) => doc.id !== id))
+        toast({
+          title: "Document deleted",
+          description: "The document has been deleted successfully.",
+        })
+        return
+      }
+
+      const supabase = createSafeClient()
+      if (!supabase) {
+        throw new Error("Supabase client not available")
+      }
+
+      const { error } = await supabase.from("documents").delete().eq("id", id)
+
+      if (error) {
+        throw error
+      }
+
       setDocuments(documents.filter((doc) => doc.id !== id))
       toast({
         title: "Document deleted",
@@ -231,6 +339,18 @@ export function DocumentManagement() {
       rowSelection,
     },
   })
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-50 text-red-800 rounded-md">
+        <h3 className="font-bold mb-2">Error</h3>
+        <p>{error}</p>
+        <Button onClick={() => window.location.reload()} variant="outline" className="mt-4">
+          Retry
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">

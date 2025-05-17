@@ -1,4 +1,4 @@
-"\"use client"
+"use client"
 
 import type React from "react"
 
@@ -27,8 +27,8 @@ export interface SearchResult {
   }
 }
 
-// Export the SearchInterface component as default
-export default function SearchInterface() {
+// Component definition
+function SearchInterface() {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -187,3 +187,7 @@ export default function SearchInterface() {
     </Card>
   )
 }
+
+// Export both as default and named export to support both import styles
+export default SearchInterface
+export { SearchInterface }
