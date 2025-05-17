@@ -49,6 +49,11 @@ const nextConfig = {
       },
     })
 
+    // Add a rule to handle PDF.js in Node.js environment
+    if (isServer) {
+      config.externals = [...config.externals, "canvas", "jsdom"]
+    }
+
     return config
   },
   // Disable image optimization during development to avoid potential issues
