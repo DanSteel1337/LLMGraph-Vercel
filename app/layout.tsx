@@ -14,6 +14,10 @@ export const metadata: Metadata = {
     generator: 'v0.dev'
 }
 
+// Disable static generation for this layout
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+
 export default function RootLayout({
   children,
 }: {

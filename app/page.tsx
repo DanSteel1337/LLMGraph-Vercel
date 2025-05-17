@@ -15,6 +15,10 @@ import { DocumentUploadFormWrapper } from "@/components/upload/document-upload-f
 import { ProtectedPageWrapper } from "@/components/protected-page-wrapper"
 import { EnvVarChecker } from "@/components/dashboard/env-var-checker"
 
+// Disable static generation for this page
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+
 export default function DashboardPage() {
   return (
     <ProtectedPageWrapper>
