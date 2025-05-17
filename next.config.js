@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -9,8 +8,8 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   experimental: {
-    serverComponentsExternalPackages: ["@pinecone-database/pinecone", "pdfjs-dist"],
-    esmExternals: "loose", // This is key for handling ESM packages
+    // Updated for Next.js 15 compatibility
+    serverActions: true,
   },
   webpack: (config, { isServer }) => {
     // Handle Node.js modules properly
@@ -56,8 +55,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Disable CSS optimization to avoid critters dependency
-  optimizeCss: false,
 }
 
 module.exports = nextConfig
