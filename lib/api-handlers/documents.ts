@@ -1,65 +1,5 @@
-// Polyfill for DOMMatrix before any imports
-if (typeof global !== "undefined" && typeof global.DOMMatrix === "undefined") {
-  class DOMMatrixPolyfill {
-    a = 1
-    b = 0
-    c = 0
-    d = 1
-    e = 0
-    f = 0
-    m11 = 1
-    m12 = 0
-    m13 = 0
-    m14 = 0
-    m21 = 0
-    m22 = 1
-    m23 = 0
-    m24 = 0
-    m31 = 0
-    m32 = 0
-    m33 = 1
-    m34 = 0
-    m41 = 0
-    m42 = 0
-    m43 = 0
-    m44 = 1
-    is2D = true
-    isIdentity = true
-
-    constructor(init?: string | number[]) {
-      // Basic initialization logic
-      if (init && Array.isArray(init)) {
-        if (init.length === 6) {
-          ;[this.a, this.b, this.c, this.d, this.e, this.f] = init
-          this.m11 = this.a
-          this.m12 = this.b
-          this.m21 = this.c
-          this.m22 = this.d
-          this.m41 = this.e
-          this.m42 = this.f
-        }
-      }
-    }
-
-    // Minimal required methods
-    multiply() {
-      return new DOMMatrixPolyfill()
-    }
-    inverse() {
-      return new DOMMatrixPolyfill()
-    }
-    translate() {
-      return new DOMMatrixPolyfill()
-    }
-  }
-  // Assign to global
-  ;(global as any).DOMMatrix = DOMMatrixPolyfill
-}
-
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase/server"
-import { extractTextFromPDFBuffer, extractTextFromPDFBufferFallback } from "@/lib/server-pdf-processor"
-import { generateEmbeddings } from "@/lib/ai/embeddings"
 import { v4 as uuidv4 } from "uuid"
 
 // Type definitions
@@ -217,14 +157,15 @@ export async function processDocumentHandler(req: NextRequest) {
     // Read file as buffer
     const buffer = Buffer.from(await file.arrayBuffer())
 
-    // Extract text from PDF
-    let content: string
-    try {
-      content = await extractTextFromPDFBuffer(buffer)
-    } catch (error) {
-      console.warn("Error extracting text with PDF.js, using fallback:", error)
-      content = extractTextFromPDFBufferFallback(buffer)
-    }
+    // Instead of trying to extract text from PDF, we'll just store the file
+    // and create a placeholder for the content
+    const content = `Document: ${title}
+Category: ${category || "Uncategorized"}
+Version: ${version || "1.0"}
+Size: ${buffer.length} bytes
+
+This document was uploaded but text extraction is performed client-side.
+The document will be processed when viewed.`
 
     // Create document record
     const documentInput: DocumentInput = {
@@ -232,7 +173,7 @@ export async function processDocumentHandler(req: NextRequest) {
       content,
       category: category || "Uncategorized",
       version: version || "1.0",
-      status: "processing",
+      status: "pending_processing",
     }
 
     const { data: document, error: docError } = await createDocument(documentInput)
@@ -241,19 +182,34 @@ export async function processDocumentHandler(req: NextRequest) {
       return NextResponse.json({ error: docError?.message || "Failed to create document" }, { status: 500 })
     }
 
-    // Process document in background (in a real app, this would be a background job)
-    // For now, we'll just do it synchronously
+    // Store the raw file in Supabase Storage for later processing
     try {
-      await processDocument(document.id, content)
+      const supabase = await createServerClient()
+      const { error: storageError } = await supabase.storage
+        .from("document_files")
+        .upload(`${document.id}.pdf`, buffer, {
+          contentType: "application/pdf",
+          upsert: true,
+        })
 
-      // Update document status to complete
-      await updateDocument(document.id, { status: "complete" })
+      if (storageError) {
+        console.error("Error storing PDF file:", storageError)
+        await updateDocument(document.id, { status: "error_storing_file" })
+        return NextResponse.json({ error: "Failed to store document file" }, { status: 500 })
+      }
+
+      // Update document status
+      await updateDocument(document.id, { status: "ready_for_processing" })
     } catch (error) {
-      console.error("Error processing document:", error)
+      console.error("Error in file storage:", error)
       await updateDocument(document.id, { status: "error" })
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Unknown error storing file" },
+        { status: 500 },
+      )
     }
 
-    return NextResponse.json({ document }, { status: 201 })
+    return NextResponse.json({ document, message: "Document uploaded and ready for processing" }, { status: 201 })
   } catch (error) {
     console.error("Error in processDocumentHandler:", error)
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 })
@@ -261,7 +217,7 @@ export async function processDocumentHandler(req: NextRequest) {
 }
 
 // Process document content into chunks and vectors
-async function processDocument(documentId: string, content: string) {
+export async function processDocument(documentId: string, content: string) {
   try {
     const supabase = await createServerClient()
 
@@ -282,28 +238,9 @@ async function processDocument(documentId: string, content: string) {
       if (chunkError) {
         throw chunkError
       }
-
-      // Generate embeddings for chunk
-      try {
-        const embedding = await generateEmbeddings(chunk)
-
-        // Store embedding
-        const { error: vectorError } = await supabase.from("document_vectors").insert({
-          document_id: documentId,
-          chunk_index: i,
-          embedding,
-        })
-
-        if (vectorError) {
-          throw vectorError
-        }
-      } catch (error) {
-        console.error(`Error generating embedding for chunk ${i}:`, error)
-        // Continue with other chunks even if one fails
-      }
     }
 
-    return true
+    return { success: true, chunksProcessed: chunks.length }
   } catch (error) {
     console.error(`Error in processDocument for ID ${documentId}:`, error)
     throw error

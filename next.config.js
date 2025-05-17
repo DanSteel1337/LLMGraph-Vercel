@@ -38,20 +38,17 @@ const nextConfig = {
       }
     }
 
-    // Don't attempt to bundle the pdf.worker.mjs file
-    // Instead, we'll load it dynamically at runtime
-    config.module.rules.push({
-      test: /pdf\.worker\.(min\.)?js|pdf\.worker\.(min\.)?mjs/,
-      type: "javascript/auto",
-      loader: "file-loader",
-      options: {
-        name: "static/[name].[hash].[ext]",
-      },
-    })
-
-    // Add a rule to handle PDF.js in Node.js environment
+    // Completely exclude PDF.js from server bundle
     if (isServer) {
-      config.externals = [...config.externals, "canvas", "jsdom"]
+      const originalEntry = config.entry
+      config.entry = async () => {
+        const entries = await originalEntry()
+
+        // This prevents PDF.js from being included in the server bundle
+        config.externals = [...config.externals, "pdfjs-dist", "canvas", "jsdom"]
+
+        return entries
+      }
     }
 
     return config
