@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { AlertCircle } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import FeedbackDetailDialog from "./feedback-detail-dialog"
+import { apiClient } from "@/lib/api-client"
 
 export interface Feedback {
   id: string
@@ -32,8 +33,8 @@ export function FeedbackManagement() {
     const fetchFeedback = async () => {
       try {
         setLoading(true)
-        const response = await fetch("/api/feedback")
-        const data = await response.json()
+        const response = await apiClient.get("/api/feedback")
+        const data = await response.data
 
         if (data.message && data.message.includes("does not exist")) {
           setTableExists(false)
@@ -69,21 +70,15 @@ export function FeedbackManagement() {
     if (!selectedFeedback) return
 
     try {
-      const response = await fetch(`/api/feedback/${selectedFeedback.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status }),
-      })
+      const response = await apiClient.patch(`/api/feedback/${selectedFeedback.id}`, { status })
 
-      if (response.ok) {
+      if (response.status === 200) {
         // Update the feedback list
         setFeedback((prev) => prev.map((item) => (item.id === selectedFeedback.id ? { ...item, status } : item)))
         // Close the dialog
         setSelectedFeedback(null)
       } else {
-        const data = await response.json()
+        const data = await response.data
         setError(data.error || "Failed to update feedback status")
       }
     } catch (err) {

@@ -1,11 +1,8 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
-
 /**
  * Combines class names using clsx and tailwind-merge
  */
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+export function cn(...classes: (string | undefined | null | false)[]): string {
+  return classes.filter(Boolean).join(" ")
 }
 
 /**
@@ -14,18 +11,18 @@ export function cn(...inputs: ClassValue[]) {
 export function formatDate(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date
   return d.toLocaleDateString("en-US", {
+    year: "numeric",
     month: "short",
     day: "numeric",
-    year: "numeric",
   })
 }
 
 /**
  * Truncates text to a specified length
  */
-export function truncateText(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text
-  return text.slice(0, maxLength) + "..."
+export function truncateString(str: string, length: number): string {
+  if (str.length <= length) return str
+  return str.slice(0, length) + "..."
 }
 
 /**
@@ -96,4 +93,42 @@ export function debounce<T extends (...args: any[]) => any>(func: T, wait: numbe
     if (timeout) clearTimeout(timeout)
     timeout = setTimeout(later, wait)
   }
+}
+
+/**
+ * Formats a number with commas
+ */
+export function formatNumber(num: number): string {
+  return new Intl.NumberFormat().format(num)
+}
+
+/**
+ * Formats bytes to a human-readable string
+ */
+export function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 Bytes"
+
+  const k = 1024
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB"]
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+
+  return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+}
+
+/**
+ * Formats a percentage
+ */
+export function formatPercent(value: number, decimals = 1): string {
+  return `${(value * 100).toFixed(decimals)}%`
+}
+
+/**
+ * Checks if a value is empty (null, undefined, empty string, empty array, empty object)
+ */
+export function isEmpty(value: any): boolean {
+  if (value === null || value === undefined) return true
+  if (typeof value === "string") return value.trim() === ""
+  if (Array.isArray(value)) return value.length === 0
+  if (typeof value === "object") return Object.keys(value).length === 0
+  return false
 }

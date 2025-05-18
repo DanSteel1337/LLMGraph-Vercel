@@ -1,316 +1,168 @@
-"use client"
+/**
+ * Unified API Client
+ *
+ * This file serves as the single source of truth for all API calls.
+ * All components should use these methods instead of direct fetch calls.
+ */
 
-// API client for frontend
-import type { SearchResult } from "@/components/search/search-interface"
-import type { Document } from "@/components/documents/document-management"
-
-// Define Feedback type to match what's expected in the application
-export interface Feedback {
-  id: string
-  query: string
-  result: string
-  rating: number
-  comment?: string
-  status: "pending" | "reviewed" | "resolved"
-  createdAt: string
-  userId?: string
-}
-
-// Standard API response type
-interface ApiResponse<T> {
-  data: T
+// Types
+type ApiResponse<T> = {
+  success: boolean
+  data?: T
   error?: string
-  metadata?: Record<string, any>
 }
 
-// Helper function to handle API errors with standardized response format
-async function handleApiResponse<T>(response: Response): Promise<ApiResponse<T>> {
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "Unknown error")
-    throw new Error(`API error (${response.status}): ${errorText}`)
-  }
+// Base API URL
+const API_BASE = "/api"
 
-  const jsonData = await response.json()
-
-  // Standardize the response format
-  return {
-    data: jsonData.documents || jsonData.feedback || jsonData.results || jsonData.data || jsonData,
-    error: jsonData.error,
-    metadata: jsonData.metadata || {},
-  }
+// Error handling
+const handleApiError = (error: unknown): string => {
+  console.error("API Error:", error)
+  if (error instanceof Error) return error.message
+  return "An unknown error occurred"
 }
 
-// Fetch documents
-export async function fetchDocuments(): Promise<Document[]> {
+// Generic fetch wrapper with error handling
+async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
   try {
-    const response = await fetch("/api/documents", {
-      headers: {
-        "Cache-Control": "no-cache",
-      },
-    })
-
-    const result = await handleApiResponse<any[]>(response)
-
-    if (!Array.isArray(result.data)) {
-      console.warn("Expected array of documents but got:", typeof result.data)
-      return []
-    }
-
-    return result.data.map((doc: any) => ({
-      id: doc.id,
-      title: doc.title || "Untitled Document",
-      category: doc.category || "Uncategorized",
-      version: doc.metadata?.version || "",
-      uploadedAt: doc.created_at || new Date().toISOString(),
-      status: doc.status || "processed",
-      size: doc.metadata?.size || 0,
-    }))
-  } catch (error) {
-    console.error("Error fetching documents:", error)
-    // Return empty array as fallback
-    return []
-  }
-}
-
-// Delete document
-export async function deleteDocument(id: string): Promise<boolean> {
-  try {
-    const response = await fetch(`/api/documents/${id}`, {
-      method: "DELETE",
-    })
-
-    await handleApiResponse<{ success: boolean }>(response)
-    return true
-  } catch (error) {
-    console.error("Error deleting document:", error)
-    return false
-  }
-}
-
-// Update document
-export async function updateDocument(id: string, data: Partial<Document>): Promise<Document | null> {
-  try {
-    const response = await fetch(`/api/documents/${id}`, {
-      method: "PATCH",
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
       headers: {
         "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    })
-
-    const result = await handleApiResponse<{ document: Document }>(response)
-    return result.data.document || null
-  } catch (error) {
-    console.error("Error updating document:", error)
-    return null
-  }
-}
-
-// Fetch feedback
-export async function fetchFeedback(): Promise<Feedback[]> {
-  try {
-    const response = await fetch("/api/feedback", {
-      headers: {
-        "Cache-Control": "no-cache",
+        ...options?.headers,
       },
     })
 
-    const result = await handleApiResponse<any[]>(response)
+    const data = await response.json()
 
-    if (!Array.isArray(result.data)) {
-      console.warn("Expected array of feedback but got:", typeof result.data)
-      return []
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || `Error: ${response.status} ${response.statusText}`,
+      }
     }
-
-    return result.data.map((item: any) => ({
-      id: item.id,
-      query: item.query || "",
-      result: item.result || "",
-      rating: item.rating || 0,
-      comment: item.comment || "",
-      status: item.status || "pending",
-      createdAt: item.created_at || new Date().toISOString(),
-      userId: item.user_id || undefined,
-    }))
-  } catch (error) {
-    console.error("Error fetching feedback:", error)
-    // Return empty array as fallback
-    return []
-  }
-}
-
-// Update feedback status
-export async function updateFeedbackStatus(id: string, status: "pending" | "reviewed" | "resolved"): Promise<boolean> {
-  try {
-    const response = await fetch(`/api/feedback/${id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ status }),
-    })
-
-    await handleApiResponse<{ success: boolean }>(response)
-    return true
-  } catch (error) {
-    console.error("Error updating feedback status:", error)
-    return false
-  }
-}
-
-// Perform search
-export async function performSearch(params: {
-  query: string
-  mode: string
-  filters: {
-    categories: string[]
-    versions: string[]
-  }
-  generateAnswer?: boolean
-}): Promise<{
-  results: SearchResult[]
-  answer?: string
-}> {
-  try {
-    // Build query parameters
-    const queryParams = new URLSearchParams()
-    queryParams.append("query", params.query)
-
-    if (params.filters.categories.length > 0) {
-      queryParams.append("category", params.filters.categories[0])
-    }
-
-    if (params.filters.versions.length > 0) {
-      queryParams.append("version", params.filters.versions[0])
-    }
-
-    if (params.generateAnswer) {
-      queryParams.append("generateAnswer", "true")
-    }
-
-    const response = await fetch(`/api/search?${queryParams.toString()}`)
-    const result = await handleApiResponse<{ results: SearchResult[]; answer?: string }>(response)
 
     return {
-      results: Array.isArray(result.data.results) ? result.data.results : [],
-      answer: result.data.answer || undefined,
+      success: true,
+      data: data as T,
     }
   } catch (error) {
-    console.error("Error performing search:", error)
-    // Return empty results as fallback
     return {
-      results: [],
+      success: false,
+      error: handleApiError(error),
     }
   }
 }
 
-// Fetch stats
-export async function fetchStats(): Promise<any> {
-  try {
-    // Add cache-busting parameter to prevent caching issues
-    const timestamp = new Date().getTime()
-    const response = await fetch(`/api/stats?_=${timestamp}`, {
-      // Add proper headers
-      headers: {
-        Accept: "application/json",
-        "Cache-Control": "no-cache",
-      },
-      // Add a reasonable timeout
-      signal: AbortSignal.timeout(5000), // 5 second timeout
-    })
-
-    const result = await handleApiResponse<any>(response)
-    return result.data
-  } catch (error) {
-    console.error("Error fetching stats:", error)
-
-    // Return fallback data instead of null
-    return {
-      totalDocuments: 0,
-      totalSearches: 0,
-      totalFeedback: 0,
-      vectorCount: 0,
-      dimensions: 0,
-      indexName: "unknown",
-      isError: true,
-      errorMessage: error instanceof Error ? error.message : String(error),
-    }
-  }
-}
-
-// Process PDF
-export async function processPDF(
-  file: File,
-  metadata: {
-    title: string
-    category: string
-    version?: string
-    documentId: string
-  },
-): Promise<any> {
-  try {
-    const formData = new FormData()
-    formData.append("file", file)
-    formData.append("title", metadata.title)
-    formData.append("category", metadata.category)
-    formData.append("version", metadata.version || "1.0")
-    formData.append("documentId", metadata.documentId)
-
-    const response = await fetch("/api/process-pdf", {
+// Documents API
+export const documentsApi = {
+  getAll: () => fetchApi("/documents"),
+  getById: (id: string) => fetchApi(`/documents/${id}`),
+  create: (data: any) =>
+    fetchApi("/documents", {
       method: "POST",
-      body: formData,
-    })
-
-    const result = await handleApiResponse<any>(response)
-    return result.data
-  } catch (error) {
-    console.error("Error processing PDF:", error)
-    throw error
-  }
+      body: JSON.stringify(data),
+    }),
+  update: (id: string, data: any) =>
+    fetchApi(`/documents/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: string) =>
+    fetchApi(`/documents/${id}`, {
+      method: "DELETE",
+    }),
 }
 
-// Check health
-export async function checkHealth(): Promise<any> {
-  try {
-    console.log("Initiating health check")
-    // Add cache-busting parameter and timeout
-    const timestamp = new Date().getTime()
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+// Search API
+export const searchApi = {
+  search: (query: string, filters?: any) =>
+    fetchApi("/search", {
+      method: "POST",
+      body: JSON.stringify({ query, filters }),
+    }),
+  getPopularSearches: () => fetchApi("/search/popular"),
+  getSearchTrends: () => fetchApi("/search/trends"),
+}
 
-    const response = await fetch(`/api/health?_=${timestamp}`, {
-      headers: {
-        Accept: "application/json",
-        "Cache-Control": "no-cache",
-      },
-      signal: controller.signal,
-    })
+// Feedback API
+export const feedbackApi = {
+  getAll: () => fetchApi("/feedback"),
+  getById: (id: string) => fetchApi(`/feedback/${id}`),
+  create: (data: any) =>
+    fetchApi("/feedback", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (id: string, data: any) =>
+    fetchApi(`/feedback/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: string) =>
+    fetchApi(`/feedback/${id}`, {
+      method: "DELETE",
+    }),
+}
 
-    clearTimeout(timeoutId) // Clear the timeout if the request completes
+// System API
+export const systemApi = {
+  getStatus: () => fetchApi("/system/status"),
+  getHealth: () => fetchApi("/system/health"),
+  getAnalytics: () => fetchApi("/system/analytics"),
+}
 
-    const result = await handleApiResponse<any>(response)
-    return result.data
-  } catch (error) {
-    // Provide detailed error logging
-    if (error.name === "AbortError") {
-      console.error("Health check timed out after 5 seconds")
-    } else {
-      console.error("Error checking health:", error)
-    }
+// Settings API
+export const settingsApi = {
+  getSettings: () => fetchApi("/settings"),
+  updateSettings: (data: any) =>
+    fetchApi("/settings", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+}
 
-    // Return fallback health data
-    return {
-      status: "unhealthy",
-      api: { status: "unknown", message: "Could not check API status" },
-      database: { status: "unknown", message: "Could not check database status" },
-      pinecone: { status: "unknown", message: "Could not check Pinecone status" },
-      openai: { status: "unknown", message: "Could not check OpenAI status" },
-      error: error instanceof Error ? error.message : String(error),
-      timestamp: new Date().toISOString(),
-      debug: {
-        clientError: error instanceof Error ? error.message : String(error),
-        clientStack: error instanceof Error ? error.stack : undefined,
-      },
-    }
-  }
+// Export a default object with all APIs
+const apiClient = {
+  documents: documentsApi,
+  search: searchApi,
+  feedback: feedbackApi,
+  system: systemApi,
+  settings: settingsApi,
+}
+
+export default apiClient
+
+// Named exports for individual functions
+export const getAllDocuments = documentsApi.getAll
+export const getDocumentById = documentsApi.getById
+export const createDocument = documentsApi.create
+export const updateDocument = documentsApi.update
+export const deleteDocument = documentsApi.delete
+
+export const searchDocuments = searchApi.search
+export const getPopularSearches = searchApi.getPopularSearches
+export const getSearchTrends = searchApi.getSearchTrends
+
+export const getAllFeedback = feedbackApi.getAll
+export const getFeedbackById = feedbackApi.getById
+export const createFeedback = feedbackApi.create
+export const updateFeedback = feedbackApi.update
+export const deleteFeedback = feedbackApi.delete
+
+export const getSystemStatus = systemApi.getStatus
+export const getSystemHealth = systemApi.getHealth
+export const getSystemAnalytics = systemApi.getAnalytics
+
+export const getSettings = settingsApi.getSettings
+export const updateSettings = settingsApi.updateSettings
+
+/**
+ * Perform a search with the given query and filters
+ * @param query Search query
+ * @param filters Optional filters
+ * @returns Search results
+ */
+export async function performSearch(query: string, filters?: any) {
+  return searchApi.search(query, filters)
 }

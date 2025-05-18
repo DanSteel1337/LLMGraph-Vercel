@@ -2,75 +2,61 @@
 
 import { useEffect, useState } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
-import { createSafeClient } from "@/lib/supabase/client"
+import { fetchData } from "@/lib/api-client"
 
 interface PopularSearchesProps {
   limit?: number
 }
 
+// Mock data for development and fallback
+const MOCK_SEARCHES = [
+  { query: "blueprints", count: 120 },
+  { query: "materials", count: 95 },
+  { query: "animation", count: 87 },
+  { query: "lighting", count: 76 },
+  { query: "physics", count: 65 },
+]
+
 export function PopularSearches({ limit = 5 }: PopularSearchesProps) {
   const [searches, setSearches] = useState<{ query: string; count: number }[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isMockData, setIsMockData] = useState(false)
 
   useEffect(() => {
     const fetchPopularSearches = async () => {
       try {
         setIsLoading(true)
         setError(null)
+        setIsMockData(false)
 
-        // Use mock data if environment variable is set
-        if (process.env.USE_MOCK_DATA === "true") {
-          const mockData = [
-            { query: "blueprints", count: 120 },
-            { query: "materials", count: 95 },
-            { query: "animation", count: 87 },
-            { query: "lighting", count: 76 },
-            { query: "physics", count: 65 },
-          ]
-          setSearches(mockData.slice(0, limit))
+        // Check if we're on the login page
+        const isLoginPage =
+          typeof window !== "undefined" &&
+          (window.location.pathname === "/login" || window.location.pathname === "/signup")
+
+        // Use mock data if on login page or if env var is set
+        if (isLoginPage || process.env.USE_MOCK_DATA === "true") {
+          // Simulate network delay
+          await new Promise((resolve) => setTimeout(resolve, 500))
+          setSearches(MOCK_SEARCHES.slice(0, limit))
+          setIsMockData(true)
           return
         }
 
         // Use Supabase client directly instead of deprecated function
-        const supabase = createSafeClient()
-        if (!supabase) {
-          throw new Error("Supabase client not available")
-        }
-
-        // Get the most popular searches
-        const { data, error } = await supabase
-          .from("search_history")
-          .select("query")
-          .order("created_at", { ascending: false })
-          .limit(100) // Get more than we need for processing
-
-        if (error) {
-          throw error
-        }
-
-        if (!data || !Array.isArray(data)) {
-          throw new Error("Invalid data format received from Supabase")
-        }
-
-        // Count occurrences of each query
-        const queryCounts: Record<string, number> = {}
-        data.forEach((item) => {
-          const query = item.query.toLowerCase().trim()
-          queryCounts[query] = (queryCounts[query] || 0) + 1
+        const data = await fetchData<any[]>("/api/search?type=popular", {
+          requiresAuth: true,
         })
 
-        // Convert to array and sort by count
-        const popularSearches = Object.entries(queryCounts)
-          .map(([query, count]) => ({ query, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, limit)
-
-        setSearches(popularSearches)
+        setSearches(data.slice(0, limit))
       } catch (error) {
         console.error("Error fetching popular searches:", error)
         setError("Failed to fetch popular searches")
-        setSearches([])
+
+        // Use mock data as fallback
+        setSearches(MOCK_SEARCHES.slice(0, limit))
+        setIsMockData(true)
       } finally {
         setIsLoading(false)
       }
@@ -88,12 +74,13 @@ export function PopularSearches({ limit = 5 }: PopularSearchesProps) {
             <Skeleton className="h-4 w-[50px]" />
           </div>
         ))
-      ) : error ? (
+      ) : error && !isMockData ? (
         <div className="text-center py-4 text-sm text-muted-foreground">{error}</div>
       ) : searches.length === 0 ? (
         <div className="text-center py-4 text-sm text-muted-foreground">No search data available</div>
       ) : (
         <div className="space-y-2">
+          {isMockData && error && <div className="text-xs text-amber-600 mb-2">Showing mock data. Error: {error}</div>}
           {searches.map((item, index) => (
             <div key={index} className="flex justify-between items-center">
               <span className="text-sm truncate max-w-[70%]">{item.query}</span>

@@ -1,184 +1,175 @@
-import { embedWithRetry } from "./embeddings"
-import { upsertVectors, deleteVectorsByFilter } from "../pinecone/client"
-
-interface ChunkMetadata {
-  documentId: string
-  title: string
-  category: string
-  version: string
-  chunkIndex: number
-  totalChunks: number
-  createdAt: string
-  section?: string
-  subsection?: string
-  pageNumber?: number
-}
+import { generateEmbedding } from "./embeddings"
+import { getPineconeIndex } from "@/lib/pinecone/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
+import { logError } from "@/lib/error-handler"
 
 /**
  * Process a document for indexing
- * @param id Document ID
- * @param title Document title
- * @param content Document content
- * @param metadata Additional metadata
- * @returns Processing result
+ * @param document Document to process
+ * @returns Processed document with embeddings
  */
-export async function processDocument(id: string, title: string, content: string, metadata: Record<string, any> = {}) {
+export async function processDocument(document: any) {
   try {
-    console.log(`Processing document: ${title} (${id})`)
+    // Validate document
+    if (!document.content || !document.title) {
+      throw new Error("Document must have content and title")
+    }
 
-    // Split content into chunks
-    const chunks = splitIntoChunks(content)
+    // Generate embedding for document content
+    const embedding = await generateEmbedding(document.content)
 
-    // Insert document into Pinecone
-    const result = await insertDocumentIntoPinecone(id, title, content, metadata, chunks)
+    // Prepare document for indexing
+    const processedDocument = {
+      ...document,
+      embedding,
+      processedAt: new Date().toISOString(),
+    }
 
-    return { success: true, chunksProcessed: chunks.length }
+    return processedDocument
   } catch (error) {
-    console.error("Error processing document:", error)
-    throw error
+    logError(error, "document_processing_error")
+    throw new Error(`Failed to process document: ${error.message}`)
   }
 }
 
 /**
- * Split content into chunks with overlap
- * @param content Document content
+ * Insert a document into Pinecone
+ * @param document Document to insert
+ * @returns Result of the insertion
+ */
+export async function insertDocumentIntoPinecone(document: any) {
+  try {
+    // Get Pinecone index
+    const index = getPineconeIndex()
+
+    // Prepare document for Pinecone
+    const { embedding, ...metadata } = document
+
+    // Insert document into Pinecone
+    const result = await index.upsert({
+      vectors: [
+        {
+          id: document.id,
+          values: embedding,
+          metadata,
+        },
+      ],
+    })
+
+    // Update document status in Supabase
+    const supabase = getSupabaseClient()
+    await supabase
+      .from("documents")
+      .update({ status: "indexed", indexed_at: new Date().toISOString() })
+      .eq("id", document.id)
+
+    return result
+  } catch (error) {
+    logError(error, "pinecone_insert_error")
+    throw new Error(`Failed to insert document into Pinecone: ${error.message}`)
+  }
+}
+
+/**
+ * Delete a document from Pinecone
+ * @param documentId ID of the document to delete
+ * @returns Result of the deletion
+ */
+export async function deleteDocumentFromPinecone(documentId: string) {
+  try {
+    // Get Pinecone index
+    const index = getPineconeIndex()
+
+    // Delete document from Pinecone
+    const result = await index.delete({
+      ids: [documentId],
+    })
+
+    // Update document status in Supabase
+    const supabase = getSupabaseClient()
+    await supabase
+      .from("documents")
+      .update({ status: "deleted", deleted_at: new Date().toISOString() })
+      .eq("id", documentId)
+
+    return result
+  } catch (error) {
+    logError(error, "pinecone_delete_error")
+    throw new Error(`Failed to delete document from Pinecone: ${error.message}`)
+  }
+}
+
+/**
+ * Chunk a document into smaller pieces for better indexing
+ * @param document Document to chunk
  * @param chunkSize Size of each chunk
  * @param overlap Overlap between chunks
- * @returns Array of content chunks
+ * @returns Array of document chunks
  */
-export function splitIntoChunks(content: string, chunkSize = 1000, overlap = 200) {
+export function chunkDocument(document: any, chunkSize = 1000, overlap = 200) {
+  const { content, ...metadata } = document
+
+  if (!content) {
+    return [document]
+  }
+
   const chunks = []
+  let i = 0
 
-  for (let i = 0; i < content.length; i += chunkSize - overlap) {
-    const chunk = content.substring(i, i + chunkSize)
-    if (chunk.length < 50) continue // Skip very small chunks
+  while (i < content.length) {
+    // Calculate chunk boundaries
+    const chunkStart = Math.max(0, i)
+    const chunkEnd = Math.min(content.length, i + chunkSize)
+    const chunk = content.slice(chunkStart, chunkEnd)
 
+    // Create chunk document
     chunks.push({
+      ...metadata,
       content: chunk,
-      metadata: {
-        chunkIndex: chunks.length,
-      },
+      chunkIndex: chunks.length,
+      parentDocumentId: document.id,
     })
+
+    // Move to next chunk with overlap
+    i += chunkSize - overlap
   }
 
   return chunks
 }
 
 /**
- * Insert document into Pinecone
- * @param id Document ID
- * @param title Document title
- * @param content Full document content
- * @param metadata Additional metadata
- * @param chunks Content chunks
- * @returns Insertion result
+ * Batch process multiple documents
+ * @param documents Array of documents to process
+ * @returns Results of processing
  */
-export async function insertDocumentIntoPinecone(
-  id: string,
-  title: string,
-  content: string,
-  metadata: Record<string, any>,
-  chunks: { content: string; metadata: Record<string, any> }[],
-) {
-  try {
-    console.log(`Inserting document into Pinecone: ${title} (${id})`)
+export async function batchProcessDocuments(documents: any[]) {
+  const results = []
+  const errors = []
 
-    // Process chunks and generate embeddings
-    const vectors = await Promise.all(
-      chunks.map(async (chunk, i) => {
-        const embedding = await embedWithRetry(chunk.content)
-        return {
-          id: `${id}_chunk_${i}`,
-          values: embedding,
-          metadata: {
-            ...chunk.metadata,
-            ...metadata,
-            documentId: id,
-            title,
-            text: chunk.content,
-            chunkIndex: i,
-          },
-        }
-      }),
-    )
-
-    // Insert vectors in batches to avoid rate limits
-    const batchSize = 100
-    for (let i = 0; i < vectors.length; i += batchSize) {
-      const batch = vectors.slice(i, i + batchSize)
-      await upsertVectors(batch)
+  for (const document of documents) {
+    try {
+      const processedDocument = await processDocument(document)
+      const insertResult = await insertDocumentIntoPinecone(processedDocument)
+      results.push({
+        documentId: document.id,
+        success: true,
+        result: insertResult,
+      })
+    } catch (error) {
+      logError(error, "batch_processing_error")
+      errors.push({
+        documentId: document.id,
+        success: false,
+        error: error.message,
+      })
     }
-
-    return { success: true, chunksInserted: vectors.length }
-  } catch (error) {
-    console.error("Error inserting document into Pinecone:", error)
-    throw error
   }
-}
 
-/**
- * Delete document from Pinecone
- * @param id Document ID
- * @returns Deletion result
- */
-export async function deleteDocumentFromPinecone(id: string) {
-  try {
-    console.log(`Deleting document from Pinecone: ${id}`)
-
-    // Delete by metadata filter
-    await deleteVectorsByFilter({
-      documentId: id,
-    })
-
-    return { success: true }
-  } catch (error) {
-    console.error("Error deleting document from Pinecone:", error)
-    throw error
-  }
-}
-
-/**
- * Delete document vectors
- * @param documentId Document ID
- * @returns Deletion result
- */
-export async function deleteDocumentVectors(documentId: string) {
-  return deleteDocumentFromPinecone(documentId)
-}
-
-interface TextChunk {
-  text: string
-  section?: string
-  subsection?: string
-}
-
-/**
- * Track document processing status
- * @param documentId Document ID
- * @param status Processing status
- * @param progress Progress percentage (0-100)
- * @param error Optional error message
- */
-export async function updateProcessingStatus(
-  documentId: string,
-  status: "processing" | "completed" | "failed",
-  progress = 0,
-  error?: string,
-) {
-  try {
-    await fetch("/api/documents/status", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        documentId,
-        status,
-        progress,
-        error,
-      }),
-    })
-  } catch (e) {
-    console.error("Error updating processing status:", e)
+  return {
+    success: errors.length === 0,
+    results,
+    errors,
+    totalProcessed: results.length,
+    totalErrors: errors.length,
   }
 }

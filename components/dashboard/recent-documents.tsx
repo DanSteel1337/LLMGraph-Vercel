@@ -1,99 +1,96 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { formatDate } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Eye, FileText } from "lucide-react"
-import { createSafeClient } from "@/lib/supabase/client"
-
-// Define Document type locally to avoid dependency on deprecated lib/db.ts
-type Document = {
-  id: string
-  title: string
-  content?: string
-  created_at: string
-  category: string
-  metadata?: any
-}
-
-// Mock data for development when USE_MOCK_DATA is true
-const MOCK_DOCUMENTS = [
-  {
-    id: "1",
-    title: "Getting Started with Unreal Engine",
-    content: "This guide will help you get started with Unreal Engine...",
-    created_at: new Date().toISOString(),
-    category: "Beginner",
-  },
-  {
-    id: "2",
-    title: "Blueprint Basics",
-    content: "Learn the fundamentals of Blueprint visual scripting...",
-    created_at: new Date().toISOString(),
-    category: "Programming",
-  },
-  {
-    id: "3",
-    title: "Material System Overview",
-    content: "Understanding the material system in Unreal Engine...",
-    created_at: new Date().toISOString(),
-    category: "Graphics",
-  },
-]
+import { fetchData } from "@/lib/api-client"
 
 interface RecentDocumentsProps {
-  onViewDocument?: (id: string) => void
   limit?: number
 }
 
-export function RecentDocuments({ onViewDocument, limit = 5 }: RecentDocumentsProps) {
+// Define document type
+interface Document {
+  id: string
+  title: string
+  category: string
+  created_at: string
+}
+
+// Mock data for development and fallback
+const MOCK_DOCUMENTS: Document[] = [
+  {
+    id: "1",
+    title: "Blueprint Quick Start Guide",
+    category: "Blueprints",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: "2",
+    title: "Material Editor Reference",
+    category: "Materials",
+    created_at: new Date(Date.now() - 86400000).toISOString(),
+  },
+  {
+    id: "3",
+    title: "Animation System Overview",
+    category: "Animation",
+    created_at: new Date(Date.now() - 172800000).toISOString(),
+  },
+  {
+    id: "4",
+    title: "Physics Simulation Guide",
+    category: "Physics",
+    created_at: new Date(Date.now() - 259200000).toISOString(),
+  },
+  {
+    id: "5",
+    title: "Rendering Pipeline Documentation",
+    category: "Rendering",
+    created_at: new Date(Date.now() - 345600000).toISOString(),
+  },
+]
+
+export function RecentDocuments({ limit = 5 }: RecentDocumentsProps) {
   const [documents, setDocuments] = useState<Document[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isMockData, setIsMockData] = useState(false)
 
   useEffect(() => {
     const fetchRecentDocuments = async () => {
       try {
         setIsLoading(true)
         setError(null)
+        setIsMockData(false)
 
-        // Check if we should use mock data
-        if (process.env.USE_MOCK_DATA === "true") {
-          // Use mock data and sort by created_at in descending order
-          const sortedMockDocs = [...MOCK_DOCUMENTS].sort(
-            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-          )
-          setDocuments(sortedMockDocs.slice(0, limit))
+        // Check if we're on the login page
+        const isLoginPage =
+          typeof window !== "undefined" &&
+          (window.location.pathname === "/login" || window.location.pathname === "/signup")
+
+        // Use mock data if on login page or if env var is set
+        if (isLoginPage || process.env.USE_MOCK_DATA === "true") {
+          // Simulate network delay
+          await new Promise((resolve) => setTimeout(resolve, 500))
+          setDocuments(MOCK_DOCUMENTS.slice(0, limit))
+          setIsMockData(true)
           return
         }
 
-        // Use Supabase client directly
-        const supabase = createSafeClient()
-        if (!supabase) {
-          throw new Error("Supabase client not available")
-        }
+        // Fetch documents from API
+        const data = await fetchData<Document[]>("/api/documents", {
+          requiresAuth: true,
+        })
 
-        const { data, error } = await supabase
-          .from("documents")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(limit)
+        // Sort by created_at and limit
+        const sortedDocuments = data
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .slice(0, limit)
 
-        if (error) {
-          throw error
-        }
-
-        if (!data) {
-          setDocuments([])
-          return
-        }
-
-        setDocuments(data)
-      } catch (error) {
-        console.error("Error fetching recent documents:", error)
-        setError("Failed to fetch recent documents")
+        setDocuments(sortedDocuments)
+      } catch (err) {
+        setError("Failed to fetch documents")
       } finally {
         setIsLoading(false)
       }
@@ -102,88 +99,27 @@ export function RecentDocuments({ onViewDocument, limit = 5 }: RecentDocumentsPr
     fetchRecentDocuments()
   }, [limit])
 
-  function formatDate(dateString: string) {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-  }
-
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Recent Documents</CardTitle>
-        {documents.length > 0 && (
-          <Button variant="outline" size="sm" asChild>
-            <a
-              href="#documents"
-              onClick={(e) => {
-                e.preventDefault()
-                document.querySelector('[data-value="documents"]')?.click()
-              }}
-            >
-              View All
-            </a>
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="space-y-4">
-            {Array.from({ length: limit }).map((_, i) => (
-              <div key={i} className="space-y-2">
-                <Skeleton className="h-4 w-[250px]" />
-                <div className="flex gap-2">
-                  <Skeleton className="h-4 w-[100px]" />
-                  <Skeleton className="h-4 w-[60px]" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : error ? (
-          <div className="text-center py-4 text-sm text-muted-foreground">{error}</div>
-        ) : documents.length === 0 ? (
-          <div className="text-center py-8">
-            <FileText className="mx-auto h-12 w-12 text-muted-foreground/60 mb-3" />
-            <p className="text-muted-foreground">No documents available</p>
-            <Button variant="outline" size="sm" className="mt-4" asChild>
-              <a
-                href="#upload"
-                onClick={(e) => {
-                  e.preventDefault()
-                  document.querySelector('[data-value="upload"]')?.click()
-                }}
-              >
-                Upload Documents
-              </a>
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {documents.map((doc) => (
-              <div key={doc.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{doc.title}</div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="outline">{doc.category}</Badge>
-                    {doc.metadata?.version && <Badge variant="secondary">{doc.metadata.version}</Badge>}
-                    <span className="text-xs text-muted-foreground">{formatDate(doc.created_at)}</span>
-                  </div>
-                </div>
-                {onViewDocument && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onViewDocument(doc.id)}
-                    className="ml-2 flex items-center gap-1"
-                  >
-                    <Eye className="h-4 w-4" />
-                    <span className="sr-only md:not-sr-only md:inline-block">View</span>
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <div>
+      {isLoading && (
+        <div>
+          {Array.from({ length: limit }, (_, index) => (
+            <Skeleton key={index} className="h-10 w-full mb-2" />
+          ))}
+        </div>
+      )}
+      {error && <div>{error}</div>}
+      {!isLoading && !error && (
+        <ul>
+          {documents.map((doc) => (
+            <li key={doc.id}>
+              <h3>{doc.title}</h3>
+              <p>{doc.category}</p>
+              <p>{formatDate(doc.created_at)}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }

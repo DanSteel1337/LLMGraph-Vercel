@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ThumbsUp, ThumbsDown, ExternalLink, ChevronDown, ChevronUp } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { feedbackApi } from "@/lib/api-client"
 
 interface SearchResult {
   id: string
@@ -38,13 +39,23 @@ export default function SearchResults({ results, query, onFeedback }: SearchResu
     }))
   }
 
-  const handleFeedback = (id: string, isPositive: boolean) => {
+  const handleFeedback = async (id: string, isPositive: boolean) => {
     if (!feedbackGiven[id]) {
-      onFeedback(id, isPositive)
-      setFeedbackGiven((prev) => ({
-        ...prev,
-        [id]: true,
-      }))
+      try {
+        await feedbackApi.create({
+          resultId: id,
+          query,
+          isPositive,
+        })
+
+        onFeedback(id, isPositive)
+        setFeedbackGiven((prev) => ({
+          ...prev,
+          [id]: true,
+        }))
+      } catch (error) {
+        console.error("Error submitting feedback:", error)
+      }
     }
   }
 

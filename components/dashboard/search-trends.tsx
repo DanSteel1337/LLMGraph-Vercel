@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
+import { apiClient } from "@/lib/api-client"
 
 interface TrendData {
   date: string
@@ -12,31 +13,60 @@ interface TrendData {
   successRate: number
 }
 
+// Mock data for development and fallback
+const MOCK_TRENDS: TrendData[] = [
+  { date: "2023-05-01", searches: 45, successRate: 82 },
+  { date: "2023-05-02", searches: 52, successRate: 78 },
+  { date: "2023-05-03", searches: 61, successRate: 85 },
+  { date: "2023-05-04", searches: 48, successRate: 79 },
+  { date: "2023-05-05", searches: 64, successRate: 88 },
+  { date: "2023-05-06", searches: 57, successRate: 84 },
+  { date: "2023-05-07", searches: 68, successRate: 91 },
+]
+
 export function SearchTrends() {
   const [data, setData] = useState<TrendData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("week")
+  const [isMockData, setIsMockData] = useState(false)
 
   useEffect(() => {
     const fetchSearchTrends = async () => {
       try {
         setIsLoading(true)
         setError(null)
+        setIsMockData(false)
 
-        // Fetch search trends from API
-        const response = await fetch("/api/search/trends")
+        // Check if we're on the login page
+        const isLoginPage =
+          typeof window !== "undefined" &&
+          (window.location.pathname === "/login" || window.location.pathname === "/signup")
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch search trends: ${response.statusText}`)
+        // Use mock data if on login page or if env var is set
+        if (isLoginPage || process.env.USE_MOCK_DATA === "true") {
+          // Simulate network delay
+          await new Promise((resolve) => setTimeout(resolve, 500))
+          setData(MOCK_TRENDS)
+          setIsMockData(true)
+          return
         }
 
-        const trendsData = await response.json()
-        setData(trendsData)
+        // Fetch real data from API
+        const trendsData = await apiClient.getSearchTrends()
+
+        if (Array.isArray(trendsData.data)) {
+          setData(trendsData.data)
+        } else {
+          throw new Error("Invalid data format received")
+        }
       } catch (error) {
         console.error("Error fetching search trends:", error)
         setError("Failed to fetch search trends")
-        setData([])
+
+        // Use mock data as fallback
+        setData(MOCK_TRENDS)
+        setIsMockData(true)
       } finally {
         setIsLoading(false)
       }
@@ -67,7 +97,7 @@ export function SearchTrends() {
     )
   }
 
-  if (error) {
+  if (error && !isMockData) {
     return (
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
@@ -87,6 +117,8 @@ export function SearchTrends() {
 
   return (
     <div className="space-y-4">
+      {isMockData && error && <div className="text-xs text-amber-600 mb-2">Showing mock data. Error: {error}</div>}
+
       <Tabs defaultValue="week" onValueChange={setActiveTab}>
         <div className="flex items-center justify-between">
           <TabsList>

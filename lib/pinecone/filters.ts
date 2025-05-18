@@ -147,3 +147,44 @@ export function createSearchFilter(params: {
 
   return combineFilters(filters)
 }
+
+/**
+ * Builds Pinecone filters from a filter object
+ * @param filters Filter object
+ * @returns Pinecone filter object
+ */
+export function buildPineconeFilters(filters: Record<string, any>): PineconeFilter {
+  if (!filters || Object.keys(filters).length === 0) {
+    return {}
+  }
+
+  const pineconeFilters: PineconeFilter[] = []
+
+  // Process category filters
+  if (filters.categories && Array.isArray(filters.categories) && filters.categories.length > 0) {
+    pineconeFilters.push(createCategoryFilter(filters.categories))
+  }
+
+  // Process date range filters
+  if (filters.startDate || filters.endDate) {
+    pineconeFilters.push(createDateRangeFilter(filters.startDate, filters.endDate))
+  }
+
+  // Process version filters
+  if (filters.version) {
+    pineconeFilters.push(createVersionFilter(filters.version))
+  }
+
+  // Process document ID filter
+  if (filters.documentId) {
+    pineconeFilters.push(createDocumentIdFilter(filters.documentId))
+  }
+
+  // Process text filter
+  if (filters.text) {
+    pineconeFilters.push(createTextFilter(filters.text))
+  }
+
+  // Combine all filters with AND logic
+  return combineFilters(pineconeFilters)
+}

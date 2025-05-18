@@ -65,3 +65,11 @@ export function highlightText(text: string, query: string): string {
   // Replace matches with highlighted version
   return text.replace(pattern, "<mark>$1</mark>")
 }
+
+/**
+ * Generate embedding for a single text
+ * Alias for generateEmbeddings for backward compatibility
+ * @param text Text to embed
+ * @returns Embedding vector
+ */
+export const generateEmbedding = generateEmbeddings

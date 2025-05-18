@@ -1,70 +1,80 @@
-// Update imports to use the new @supabase/ssr package instead of deprecated auth-helpers
-import { createServerClient } from "@supabase/ssr"
+import { createServerClient as createSupabaseServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import type { Database } from "@/types/supabase"
+import { isBrowser } from "@/lib/utils"
+import { createSupabaseClient } from "./utils"
 
-// Re-export createServerClient for direct imports
-export { createServerClient }
+// Error message for server-side usage in browser context
+const SERVER_ONLY_ERROR = "Supabase server client cannot be used in browser context"
 
-// Create a Supabase client for server components
-export function getServerSupabaseClient() {
-  const cookieStore = cookies()
+// Track if we've already logged the "no session" message
+let hasLoggedNoSession = false
 
-  return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name) {
-          return cookieStore.get(name)?.value
-        },
-        set(name, value, options) {
-          cookieStore.set({ name, value, ...options })
-        },
-        remove(name, options) {
-          cookieStore.set({ name, value: "", ...options })
-        },
-      },
-    },
-  )
-}
-
-// Create a Supabase client for route handlers
-export function getRouteSupabaseClient() {
-  const cookieStore = cookies()
-
-  return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name) {
-          return cookieStore.get(name)?.value
-        },
-        set(name, value, options) {
-          cookieStore.set({ name, value, ...options })
-        },
-        remove(name, options) {
-          cookieStore.set({ name, value: "", ...options })
-        },
-      },
-    },
-  )
-}
-
-// Create a direct Supabase client using environment variables
-import { createClient } from "@supabase/supabase-js"
-
-// Export createClient as a named export to fix deployment error
-export { createClient }
-
-export function getDirectSupabaseClient() {
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Missing Supabase environment variables")
+/**
+ * Creates a Supabase client for server-side usage
+ * This should only be used in server components, API routes, or server actions
+ */
+export function createClient() {
+  if (isBrowser()) {
+    console.error(SERVER_ONLY_ERROR)
+    throw new Error(SERVER_ONLY_ERROR)
   }
 
-  return createClient<Database>(supabaseUrl, supabaseKey)
+  const cookieStore = cookies()
+
+  return createSupabaseServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    cookies: {
+      get(name) {
+        return cookieStore.get(name)?.value
+      },
+      set(name, value, options) {
+        cookieStore.set({ name, value, ...options })
+      },
+      remove(name, options) {
+        cookieStore.set({ name, value: "", ...options })
+      },
+    },
+    auth: {
+      onAuthStateChange: (event, session) => {
+        if (!session && !hasLoggedNoSession && process.env.NODE_ENV === "production") {
+          console.log("[SERVER] No active session found")
+          hasLoggedNoSession = true
+        }
+      },
+    },
+  })
 }
+
+/**
+ * Creates a Supabase admin client with service role permissions
+ * This should only be used in server contexts where admin privileges are required
+ */
+export function createAdminClient() {
+  if (isBrowser()) {
+    console.error(SERVER_ONLY_ERROR)
+    throw new Error(SERVER_ONLY_ERROR)
+  }
+
+  return createSupabaseServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+}
+
+/**
+ * Retrieves a Supabase server client using cookies
+ * This should be used in server contexts where Supabase client is needed
+ */
+export function getSupabaseServerClient() {
+  const cookieStore = cookies()
+
+  return createSupabaseClient({
+    Cookie: cookieStore.toString(),
+  })
+}
+
+/**
+ * Export createServerClient for compatibility
+ */
+export const createServerClient = createSupabaseServerClient

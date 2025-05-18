@@ -1,6 +1,7 @@
-import { embedWithRetry } from "./embeddings"
-import { querySimilarVectors } from "../pinecone/client"
-import { createCategoryFilter, combineFilters } from "../pinecone/filters"
+import { generateEmbedding } from "./embeddings"
+import { getPineconeIndex } from "@/lib/pinecone/client"
+import { buildPineconeFilters } from "@/lib/pinecone/filters"
+import { logError } from "@/lib/error-handler"
 
 // Type for search result
 export interface SearchResult {
@@ -134,35 +135,24 @@ function rerank(matches: any[], keywords: string[], originalQuery: string): any[
  * Perform hybrid search combining vector similarity and keyword matching
  * @param query Search query
  * @param filters Optional filters
- * @param topK Number of results to return
+ * @param limit Maximum number of results to return
  * @returns Search results
  */
-export async function hybridSearch(
-  query: string,
-  filters: Record<string, any> = {},
-  topK = 10,
-): Promise<SearchResult[]> {
+export async function hybridSearch(query: string, filters?: Record<string, any>, limit = 10): Promise<SearchResult[]> {
   try {
     console.log(`Performing hybrid search for: "${query}"`)
 
-    // Generate embedding for vector search
-    const embedding = await embedWithRetry(query)
-
-    // Prepare filter
-    const categoryFilter = filters.categories ? createCategoryFilter(filters.categories) : {}
-    const combinedFilter = combineFilters([categoryFilter, filters.custom || {}])
-
-    // Get more results than needed for reranking
-    const vectorResults = await querySimilarVectors(embedding, topK * 2, combinedFilter)
+    // Vector search
+    const vectorResults = await searchWithEmbeddings(query, filters, limit * 2)
 
     // Extract keywords for text matching
     const keywords = extractKeywords(query)
 
     // Rerank results using keyword matching
-    const rerankedResults = rerank(vectorResults.matches || [], keywords, query)
+    const rerankedResults = rerank(vectorResults, keywords, query)
 
     // Return top K results after reranking
-    return rerankedResults.slice(0, topK).map((match) => ({
+    return rerankedResults.slice(0, limit).map((match) => ({
       id: match.id,
       score: match.score,
       title: match.metadata?.title || "Untitled Document",
@@ -174,8 +164,9 @@ export async function hybridSearch(
       matchType: match.matchType,
     }))
   } catch (error) {
+    logError(error, "hybrid_search_failure")
     console.error("Error performing hybrid search:", error)
-    throw error
+    return []
   }
 }
 
@@ -196,13 +187,21 @@ export async function searchSimilarDocuments(
     console.log(`Searching for documents similar to: "${query}"`)
 
     // Generate embedding for the query
-    const embedding = await embedWithRetry(query)
+    const embedding = await generateEmbedding(query)
 
-    // Prepare filter if provided
-    const filterObj = filters ? { metadata: filters } : undefined
+    // Get Pinecone index
+    const index = getPineconeIndex()
+
+    // Build Pinecone filters
+    const pineconeFilters = filters ? buildPineconeFilters(filters) : undefined
 
     // Query Pinecone
-    const results = await querySimilarVectors(embedding, topK, filterObj)
+    const results = await index.query({
+      vector: embedding,
+      topK: topK,
+      filter: pineconeFilters,
+      includeMetadata: true,
+    })
 
     console.log(`Found ${results.matches?.length || 0} matches in Pinecone`)
 
@@ -221,8 +220,12 @@ export async function searchSimilarDocuments(
       })) || []
     )
   } catch (error) {
-    console.error("Error searching documents:", error)
-    throw error
+    // Log the error
+    logError(error, "pinecone_search_failure")
+
+    // Return empty results instead of crashing
+    console.error("Pinecone search error:", error)
+    return []
   }
 }
 
@@ -255,3 +258,40 @@ export async function trackSearchQuery(query: string, resultCount: number, userI
 
 // Add the missing export to fix deployment error
 export const searchDocuments = hybridSearch
+
+/**
+ * Performs a search using embeddings
+ * @param query The search query
+ * @param filters Optional filters to apply to the search
+ * @param limit Maximum number of results to return
+ * @returns Search results
+ */
+export async function searchWithEmbeddings(query: string, filters?: Record<string, any>, limit = 10) {
+  try {
+    // Generate embedding for the query
+    const embedding = await generateEmbedding(query)
+
+    // Get Pinecone index
+    const index = getPineconeIndex()
+
+    // Build Pinecone filters
+    const pineconeFilters = filters ? buildPineconeFilters(filters) : undefined
+
+    // Query Pinecone
+    const results = await index.query({
+      vector: embedding,
+      topK: limit,
+      filter: pineconeFilters,
+      includeMetadata: true,
+    })
+
+    return results.matches || []
+  } catch (error) {
+    // Log the error
+    logError(error, "pinecone_search_failure")
+
+    // Return empty results instead of crashing
+    console.error("Pinecone search error:", error)
+    return []
+  }
+}

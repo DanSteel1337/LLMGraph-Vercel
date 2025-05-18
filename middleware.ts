@@ -5,6 +5,9 @@ import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
 // Define protected routes that require authentication
 const protectedRoutes = ["/documents", "/upload", "/admin", "/settings"]
 
+// Track if we've already logged the "no session" message
+let hasLoggedNoSession = false
+
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
 
@@ -14,7 +17,15 @@ export async function middleware(req: NextRequest) {
   // Check if the user is authenticated
   const {
     data: { session },
+    error,
   } = await supabase.auth.getSession()
+
+  if (error) {
+    // Only log in development
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[Middleware] Auth error:", error.message)
+    }
+  }
 
   // Get the pathname from the request
   const { pathname } = req.nextUrl
@@ -23,6 +34,12 @@ export async function middleware(req: NextRequest) {
   const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
 
   if (isProtectedRoute && !session) {
+    // Only log once in production
+    if (!hasLoggedNoSession && process.env.NODE_ENV === "production") {
+      console.log("[Middleware] No active session found, redirecting to login")
+      hasLoggedNoSession = true
+    }
+
     // Redirect to login page if not authenticated
     const redirectUrl = new URL("/login", req.url)
     redirectUrl.searchParams.set("redirect", pathname)

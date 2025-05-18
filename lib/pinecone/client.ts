@@ -1,240 +1,81 @@
-// This file should only be imported in server components or API routes
-// It uses Node.js specific modules that won't work in the browser
-
 import { Pinecone } from "@pinecone-database/pinecone"
+import { logError } from "@/lib/error-handler"
 
-// Set runtime to nodejs for any file that imports this
-export const runtime = "nodejs"
-
+// Singleton instance
 let pineconeClient: Pinecone | null = null
 
-export async function getPineconeClient() {
-  // Only create a new client if one doesn't exist
-  if (pineconeClient) return pineconeClient
+// Development fallbacks
+const DEV_FALLBACKS = {
+  PINECONE_API_KEY: "dev-api-key",
+  PINECONE_INDEX_NAME: "dev-index",
+  PINECONE_INDEX_TYPE: "serverless",
+}
 
-  if (!process.env.PINECONE_API_KEY) {
+/**
+ * Gets or creates a Pinecone client
+ * @returns Pinecone client
+ */
+export function getPineconeClient() {
+  if (pineconeClient) {
+    return pineconeClient
+  }
+
+  const isDev = process.env.NODE_ENV === "development"
+
+  // Get API key with development fallback
+  const apiKey = process.env.PINECONE_API_KEY || (isDev ? DEV_FALLBACKS.PINECONE_API_KEY : "")
+
+  if (!apiKey) {
     throw new Error("PINECONE_API_KEY is not defined")
   }
 
-  pineconeClient = new Pinecone({
-    apiKey: process.env.PINECONE_API_KEY,
-  })
-
-  return pineconeClient
-}
-
-export async function getPineconeIndex(indexName?: string) {
-  const client = await getPineconeClient()
-  const index = client.Index(indexName || process.env.PINECONE_INDEX_NAME || "")
-
-  if (!index) {
-    throw new Error(`Pinecone index ${indexName || process.env.PINECONE_INDEX_NAME} not found`)
-  }
-
-  return index
-}
-
-export async function getIndexStats() {
-  const index = await getPineconeIndex()
-  return await index.describeIndexStats()
-}
-
-export async function querySimilarVectors(vector: number[], topK = 5, filter?: any) {
   try {
-    const index = await getPineconeIndex()
-
-    const results = await index.query({
-      vector,
-      topK,
-      includeMetadata: true,
-      filter,
+    pineconeClient = new Pinecone({
+      apiKey,
     })
 
-    return results
+    return pineconeClient
   } catch (error) {
-    console.error("Error querying Pinecone:", error)
-    throw error
+    logError(error, "pinecone_client_creation_error")
+    throw new Error(`Failed to create Pinecone client: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
 
-// Query with namespace support
-export async function querySimilarVectorsWithNamespace(vector: number[], namespace: string, topK = 5, filter?: any) {
+/**
+ * Gets a Pinecone index
+ * @returns Pinecone index
+ */
+export function getPineconeIndex() {
+  const pinecone = getPineconeClient()
+  const isDev = process.env.NODE_ENV === "development"
+
+  // Get index name with development fallback
+  const indexName = process.env.PINECONE_INDEX_NAME || (isDev ? DEV_FALLBACKS.PINECONE_INDEX_NAME : "")
+
+  if (!indexName) {
+    throw new Error("PINECONE_INDEX_NAME is not defined")
+  }
+
   try {
-    const index = await getPineconeIndex()
-    const results = await index.query({
-      vector,
-      topK,
-      includeMetadata: true,
-      filter,
-      namespace,
-    })
-    return results
+    return pinecone.Index(indexName)
   } catch (error) {
-    console.error(`Error querying Pinecone in namespace ${namespace}:`, error)
-    throw error
+    logError(error, "pinecone_index_access_error")
+    throw new Error(`Failed to access Pinecone index: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
 
-export async function upsertVectors(vectors: any[]) {
-  try {
-    const index = await getPineconeIndex()
-    await index.upsert(vectors)
-    return true
-  } catch (error) {
-    console.error("Error upserting vectors to Pinecone:", error)
-    throw error
-  }
-}
-
-// Upsert with namespace support
-export async function upsertVectorsToNamespace(vectors: any[], namespace: string) {
-  try {
-    const index = await getPineconeIndex()
-    await index.upsert({
-      vectors,
-      namespace,
-    })
-    return true
-  } catch (error) {
-    console.error(`Error upserting vectors to Pinecone namespace ${namespace}:`, error)
-    throw error
-  }
-}
-
-export async function deleteVectors(ids: string[]) {
-  try {
-    const index = await getPineconeIndex()
-    await index.deleteMany(ids)
-    return true
-  } catch (error) {
-    console.error("Error deleting vectors from Pinecone:", error)
-    throw error
-  }
-}
-
-// Delete with namespace support
-export async function deleteVectorsFromNamespace(ids: string[], namespace: string) {
-  try {
-    const index = await getPineconeIndex()
-    await index.deleteMany({
-      ids,
-      namespace,
-    })
-    return true
-  } catch (error) {
-    console.error(`Error deleting vectors from Pinecone namespace ${namespace}:`, error)
-    throw error
-  }
-}
-
-export async function deleteVectorsByFilter(filter: any) {
-  try {
-    const index = await getPineconeIndex()
-    await index.deleteMany({ filter })
-    return true
-  } catch (error) {
-    console.error("Error deleting vectors by filter from Pinecone:", error)
-    throw error
-  }
-}
-
-// Delete by filter with namespace support
-export async function deleteVectorsByFilterFromNamespace(filter: any, namespace: string) {
-  try {
-    const index = await getPineconeIndex()
-    await index.deleteMany({
-      filter,
-      namespace,
-    })
-    return true
-  } catch (error) {
-    console.error(`Error deleting vectors by filter from Pinecone namespace ${namespace}:`, error)
-    throw error
-  }
-}
-
-export async function getDocumentVectors(documentId: string) {
-  try {
-    const index = await getPineconeIndex()
-
-    const queryResponse = await index.query({
-      filter: { documentId: { $eq: documentId } },
-      includeMetadata: true,
-      includeValues: true,
-      topK: 100,
-    })
-
-    return queryResponse.matches || []
-  } catch (error) {
-    console.error(`Error fetching vectors for document ${documentId}:`, error)
-    throw error
-  }
-}
-
-// Get document vectors from namespace
-export async function getDocumentVectorsFromNamespace(documentId: string, namespace: string) {
-  try {
-    const index = await getPineconeIndex()
-
-    const queryResponse = await index.query({
-      filter: { documentId: { $eq: documentId } },
-      includeMetadata: true,
-      includeValues: true,
-      topK: 100,
-      namespace,
-    })
-
-    return queryResponse.matches || []
-  } catch (error) {
-    console.error(`Error fetching vectors for document ${documentId} from namespace ${namespace}:`, error)
-    throw error
-  }
-}
-
-// Get namespace statistics
-export async function getNamespaceStats() {
-  try {
-    const index = await getPineconeIndex()
-    const stats = await index.describeIndexStats()
-    return stats.namespaces || {}
-  } catch (error) {
-    console.error("Error getting namespace stats:", error)
-    throw error
-  }
-}
-
-// Get detailed index statistics
+/**
+ * Gets detailed stats for a Pinecone index
+ * @returns Index stats
+ */
 export async function getDetailedIndexStats() {
   try {
-    const index = await getPineconeIndex()
+    const index = getPineconeIndex()
     const stats = await index.describeIndexStats()
-
-    // Extract more detailed statistics
-    const namespaceStats = stats.namespaces || {}
-    const namespaceNames = Object.keys(namespaceStats)
-
-    // Calculate vectors per namespace
-    const namespaceCounts = namespaceNames.map((name) => ({
-      namespace: name,
-      vectorCount: namespaceStats[name].vectorCount || 0,
-      dimensions: namespaceStats[name].dimensions,
-    }))
-
-    // Get dimension and metric information
-    const indexDetails = {
-      totalVectorCount: stats.totalVectorCount || 0,
-      dimensions: stats.dimension,
-      namespaces: namespaceCounts,
-      indexFullness: stats.totalVectorCount ? stats.totalVectorCount / 1000000 : 0, // Adjust based on your index size
-      indexType: process.env.PINECONE_INDEX_TYPE || "serverless", // or "pod" based on your setup
-    }
-
-    return indexDetails
+    return stats
   } catch (error) {
-    console.error("Error getting detailed Pinecone stats:", error)
+    logError(error, "pinecone_stats_error")
+    console.error("Error getting Pinecone stats:", error)
     return null
   }
 }
-
-// Add the missing export to fix deployment error
-export const getPineconeStats = getIndexStats

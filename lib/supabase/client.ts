@@ -1,35 +1,38 @@
-import { createBrowserClient } from "@supabase/ssr"
+import { createSupabaseClient } from "./utils"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 
-// Create a singleton instance of the Supabase client for client components
-let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
+// Global singleton instance
+// Using globalThis to ensure the same instance across module reloads in development
+declare global {
+  var supabaseClientSingleton: SupabaseClient<Database> | undefined
+}
 
+// Create and export the singleton Supabase client
+export const supabase = globalThis.supabaseClientSingleton || createSupabaseClient()
+
+// In development, preserve the instance across HMR
+if (process.env.NODE_ENV !== "production") {
+  globalThis.supabaseClientSingleton = supabase
+}
+
+// Legacy function for backward compatibility
 export function getSupabaseClient() {
-  if (!supabaseClient) {
-    supabaseClient = createBrowserClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    )
+  if (typeof window === "undefined") {
+    throw new Error("getSupabaseClient should only be called on the client side")
   }
-  return supabaseClient
+
+  // Always return the singleton instance
+  return supabase
 }
 
-// Helper function to check if we're on the client side
-export function isClient() {
-  return typeof window !== "undefined"
-}
-
-// Safely create a client only on the client side
-export function createSafeClient() {
-  if (isClient()) {
-    return getSupabaseClient()
+// Safe client creation with improved error handling
+export function createSafeClient(customHeaders?: Record<string, string>) {
+  // For custom headers, we need to create a new instance
+  if (customHeaders && Object.keys(customHeaders).length > 0) {
+    return createSupabaseClient(customHeaders)
   }
-  return null
+
+  // Otherwise, return the singleton
+  return supabase
 }
-
-// Type definition for Supabase tables
-export type Tables = Database["public"]["Tables"]
-
-// IMPORTANT: Export the singleton client directly to prevent multiple instances
-const supabase = isClient() ? getSupabaseClient() : null
-export default supabase

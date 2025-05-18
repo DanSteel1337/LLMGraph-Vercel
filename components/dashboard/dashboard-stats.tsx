@@ -5,8 +5,8 @@ import type React from "react"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { FileText, Search, MessageSquare, Database, RefreshCw } from "lucide-react"
-import { fetchStats } from "@/lib/api"
 import { Button } from "@/components/ui/button"
+import { fetchData } from "@/lib/api-client"
 
 interface StatsData {
   totalDocuments: number
@@ -15,8 +15,16 @@ interface StatsData {
   vectorCount: number
   dimensions?: number
   indexName?: string
-  isError?: boolean
-  errorMessage?: string
+}
+
+// Mock data for development and fallback
+const MOCK_STATS: StatsData = {
+  totalDocuments: 125,
+  totalSearches: 1842,
+  totalFeedback: 37,
+  vectorCount: 3750,
+  dimensions: 1536,
+  indexName: "unreal-docs",
 }
 
 export function DashboardStats() {
@@ -24,30 +32,42 @@ export function DashboardStats() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
+  const [isMockData, setIsMockData] = useState(false)
 
   useEffect(() => {
     const getStats = async () => {
       try {
         setIsLoading(true)
         setError(null)
-        const data = await fetchStats()
+        setIsMockData(false)
 
-        // Check if the data has an error flag
-        if (data?.isError) {
-          setError(data.errorMessage || "Failed to fetch stats")
-          setStats(data) // Still set the stats to show fallback values
-        } else {
-          // Validate the data structure
-          if (!data || typeof data !== "object") {
-            console.error("Invalid data format for stats:", data)
-            setError("Failed to fetch stats: Invalid data format")
-          } else {
-            setStats(data)
-          }
+        // Check if we're on the login page
+        const isLoginPage =
+          typeof window !== "undefined" &&
+          (window.location.pathname === "/login" || window.location.pathname === "/signup")
+
+        // Use mock data if on login page or if env var is set
+        if (isLoginPage || process.env.USE_MOCK_DATA === "true") {
+          // Simulate network delay
+          await new Promise((resolve) => setTimeout(resolve, 500))
+          setStats(MOCK_STATS)
+          setIsMockData(true)
+          return
         }
+
+        // Fetch real data from API
+        const data = await fetchData<StatsData>("/api/system?type=stats", {
+          requiresAuth: true,
+        })
+
+        setStats(data)
       } catch (error) {
         console.error("Failed to fetch stats:", error)
         setError("Failed to fetch stats: " + (error instanceof Error ? error.message : String(error)))
+
+        // Use mock data as fallback
+        setStats(MOCK_STATS)
+        setIsMockData(true)
       } finally {
         setIsLoading(false)
       }
@@ -76,6 +96,8 @@ export function DashboardStats() {
         </Button>
       </div>
 
+      {isMockData && error && <div className="text-sm text-amber-600 mb-2">Showing mock data. Error: {error}</div>}
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard
           title="Documents"
@@ -83,7 +105,7 @@ export function DashboardStats() {
           description="Total documents indexed"
           icon={FileText}
           isLoading={isLoading}
-          error={error}
+          error={error && !isMockData ? error : null}
         />
         <StatsCard
           title="Vector Embeddings"
@@ -91,7 +113,7 @@ export function DashboardStats() {
           description={`Vectors in ${stats?.indexName || "Pinecone"}`}
           icon={Database}
           isLoading={isLoading}
-          error={error}
+          error={error && !isMockData ? error : null}
         />
         <StatsCard
           title="Searches"
@@ -99,7 +121,7 @@ export function DashboardStats() {
           description="Total search queries"
           icon={Search}
           isLoading={isLoading}
-          error={error}
+          error={error && !isMockData ? error : null}
         />
         <StatsCard
           title="Feedback"
@@ -107,7 +129,7 @@ export function DashboardStats() {
           description="User feedback collected"
           icon={MessageSquare}
           isLoading={isLoading}
-          error={error}
+          error={error && !isMockData ? error : null}
         />
       </div>
     </div>

@@ -9,14 +9,16 @@
  */
 
 import { Pinecone } from "@pinecone-database/pinecone"
-import { generateEmbeddings as genEmbed } from "./ai/embeddings"
-import { hybridSearch } from "./ai/hybrid-search"
+import { generateEmbedding } from "./ai/embeddings"
+import { searchWithEmbeddings as hybridSearch } from "./ai/hybrid-search"
 import {
   processDocument as processDoc,
   insertDocumentIntoPinecone,
   deleteDocumentFromPinecone,
 } from "./ai/document-processing"
 import { getDetailedIndexStats } from "./pinecone/client"
+import { generateText } from "ai"
+import { openai } from "@ai-sdk/openai"
 
 // Use environment variables
 const PINECONE_API_KEY = process.env.PINECONE_API_KEY || ""
@@ -54,7 +56,7 @@ function getPineconeIndex() {
 // Generate embeddings for a text
 export async function generateEmbeddings(text: string): Promise<number[]> {
   console.warn("generateEmbeddings from lib/ai-sdk.ts is deprecated. Please import from lib/ai/embeddings.ts instead.")
-  return genEmbed(text)
+  return generateEmbedding(text)
 }
 
 // Get Pinecone stats
@@ -70,7 +72,7 @@ export async function searchSimilarDocuments(query: string, filters?: Record<str
   console.warn(
     "searchSimilarDocuments from lib/ai-sdk.ts is deprecated. Please import hybridSearch from lib/ai/hybrid-search.ts instead.",
   )
-  return hybridSearch(query, filters, limit)
+  return hybridSearch(query, filters)
 }
 
 // Generate answer from search results
@@ -79,35 +81,13 @@ export async function generateAnswerFromResults(query: string, results: any[]) {
     "generateAnswerFromResults from lib/ai-sdk.ts is deprecated. Please import from lib/ai/generation.ts instead.",
   )
 
-  // Dynamic import to avoid issues with server/client
-  const { generateText } = await import("ai")
-  const { openai } = await import("@ai-sdk/openai")
-
   // Prepare context from results
   const context = results
     .map((result, index) => `Document ${index + 1} (${result.title}): ${result.content}`)
     .join("\n\n")
 
   // Generate answer using OpenAI
-  const prompt = `
-    You are an assistant for Unreal Engine documentation. Answer the following question based on the provided context.
-    If you cannot answer the question based on the context, say "I don't have enough information to answer this question."
-    
-    Context:
-    ${context}
-    
-    Question: ${query}
-    
-    Answer:
-  `
-
-  const { text } = await generateText({
-    model: openai("gpt-4o"),
-    prompt: prompt,
-    maxTokens: 500,
-  })
-
-  return text
+  return generateResponse(query, context)
 }
 
 // Process a document for indexing
@@ -122,3 +102,14 @@ export { insertDocumentIntoPinecone, deleteDocumentFromPinecone }
 
 // Mock data flag for testing
 export const USE_MOCK_DATA = process.env.USE_MOCK_DATA === "true"
+
+// Centralized AI functionality
+async function generateResponse(prompt: string, context: string) {
+  const { text } = await generateText({
+    model: openai("gpt-4o"),
+    prompt: `Context: ${context}\n\nQuestion: ${prompt}\n\nAnswer:`,
+    maxTokens: 500,
+  })
+
+  return text
+}
