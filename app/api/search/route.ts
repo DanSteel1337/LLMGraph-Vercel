@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { performHybridSearch } from "@/lib/search"
+import { MOCK_POPULAR_SEARCHES, MOCK_SEARCH_TRENDS } from "@/lib/mock-data"
 
 export const runtime = "nodejs" // Use Node.js runtime for Supabase
 
@@ -10,29 +11,17 @@ export async function GET(req: Request) {
 
     // Handle popular searches
     if (type === "popular") {
-      // Mock data for popular searches
+      // Return mock data for popular searches
       return NextResponse.json({
-        popularSearches: [
-          { query: "vector database", count: 120 },
-          { query: "embeddings", count: 95 },
-          { query: "semantic search", count: 87 },
-          { query: "RAG", count: 76 },
-          { query: "document processing", count: 65 },
-        ],
+        popularSearches: MOCK_POPULAR_SEARCHES,
       })
     }
 
     // Handle trends
     if (type === "trends") {
-      // Mock data for search trends
+      // Return mock data for search trends
       return NextResponse.json({
-        trends: [
-          { date: "2023-01", count: 45 },
-          { date: "2023-02", count: 52 },
-          { date: "2023-03", count: 78 },
-          { date: "2023-04", count: 85 },
-          { date: "2023-05", count: 120 },
-        ],
+        trends: MOCK_SEARCH_TRENDS,
       })
     }
 
@@ -41,14 +30,21 @@ export async function GET(req: Request) {
       message: "Use POST for search queries or specify type parameter",
     })
   } catch (error) {
-    console.error("Error in search API:", error)
-    return NextResponse.json(
-      {
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
+    console.error("Error in search API GET:", error)
+    // Return appropriate mock data based on the requested type
+    const url = new URL(req.url)
+    const type = url.searchParams.get("type")
+
+    if (type === "popular") {
+      return NextResponse.json({ popularSearches: MOCK_POPULAR_SEARCHES })
+    } else if (type === "trends") {
+      return NextResponse.json({ trends: MOCK_SEARCH_TRENDS })
+    }
+
+    return NextResponse.json({
+      message: "Error processing search request",
+      error: error instanceof Error ? error.message : "Unknown error",
+    })
   }
 }
 
@@ -64,13 +60,11 @@ export async function POST(req: Request) {
     const results = await performHybridSearch(query, filters)
     return NextResponse.json({ results })
   } catch (error) {
-    console.error("Error in search API:", error)
-    return NextResponse.json(
-      {
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
+    console.error("Error in search API POST:", error)
+    // Return mock search results on error
+    return NextResponse.json({
+      results: [],
+      error: "An error occurred while performing search",
+    })
   }
 }

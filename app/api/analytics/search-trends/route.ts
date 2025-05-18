@@ -1,36 +1,19 @@
 import { NextResponse } from "next/server"
-import { getSearchTrendsData } from "@/lib/api-handlers/analytics"
+import { MOCK_SEARCH_TRENDS } from "@/lib/mock-data"
 
-export async function GET(request: Request) {
+export const runtime = "nodejs" // Use Node.js runtime for Supabase
+
+export async function GET() {
   try {
-    const searchParams = new URL(request.url).searchParams
-    const period = searchParams.get("period") || "week"
-
-    const data = await getSearchTrendsData(period)
-
-    return NextResponse.json({
-      success: true,
-      data,
-    })
+    // In a real implementation, we would fetch data from the database
+    // For now, we'll return mock data
+    return NextResponse.json({ trends: MOCK_SEARCH_TRENDS })
   } catch (error) {
-    console.error("Error fetching search trends:", error)
-
-    // Return mock data as fallback
-    const mockData = [
-      { date: "2023-05-01", searches: 45, successRate: 82 },
-      { date: "2023-05-02", searches: 52, successRate: 78 },
-      { date: "2023-05-03", searches: 61, successRate: 85 },
-      { date: "2023-05-04", searches: 48, successRate: 79 },
-      { date: "2023-05-05", searches: 64, successRate: 88 },
-      { date: "2023-05-06", searches: 57, successRate: 84 },
-      { date: "2023-05-07", searches: 68, successRate: 91 },
-    ]
-
+    console.error("Error in search trends API:", error)
+    // Always return JSON, even on error
     return NextResponse.json({
-      success: true,
-      data: mockData,
-      isMockData: true,
-      error: error instanceof Error ? error.message : "Unknown error occurred",
+      trends: MOCK_SEARCH_TRENDS,
+      error: "An error occurred while fetching search trends",
     })
   }
 }

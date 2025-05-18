@@ -12,14 +12,11 @@ export async function GET() {
 
     if (error) {
       console.error("Database connection test failed:", error)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Database connection failed",
-          error: error.message,
-        },
-        { status: 500 },
-      )
+      return NextResponse.json({
+        success: false,
+        message: "Database connection failed",
+        error: error.message,
+      })
     }
 
     return NextResponse.json({
@@ -29,13 +26,11 @@ export async function GET() {
     })
   } catch (error) {
     console.error("Error testing database connection:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Database connection test failed",
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
+    // Always return JSON, even on error
+    return NextResponse.json({
+      success: false,
+      message: "Database connection test failed",
+      error: error instanceof Error ? error.message : "Unknown error",
+    })
   }
 }
