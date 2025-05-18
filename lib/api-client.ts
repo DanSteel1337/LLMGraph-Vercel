@@ -46,9 +46,16 @@ export async function apiFetch<T>(url: string, options: ApiRequestOptions = {}):
       }
     }
 
+    // Normalize URL to prevent double /api/ prefix
+    let normalizedUrl = url
+    if (url.startsWith("/api/")) {
+      normalizedUrl = url.substring(4) // Remove /api prefix
+      console.warn(`Detected double API prefix in URL: ${url}, normalized to: ${normalizedUrl}`)
+    }
+
     // Add cache-busting parameter to prevent caching issues
-    const separator = url.includes("?") ? "&" : "?"
-    const urlWithCache = `${url}${separator}_=${Date.now()}`
+    const separator = normalizedUrl.includes("?") ? "&" : "?"
+    const urlWithCache = `${normalizedUrl}${separator}_=${Date.now()}`
 
     // Set default headers
     const headers = new Headers(options.headers)

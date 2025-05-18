@@ -24,45 +24,75 @@ export async function GET(req: NextRequest) {
     switch (type) {
       case "chunks":
         if (!id) {
-          return NextResponse.json({ error: "Document ID is required", chunks: [] }, { status: 400 })
+          return NextResponse.json(
+            {
+              error: "Document ID is required",
+              chunks: [],
+              status: "error",
+            },
+            { status: 400 },
+          )
         }
 
         try {
-          const { data: chunksData, error: chunksError } = await getDocumentChunks(id)
+          const { data, error } = await getDocumentChunks(id)
 
-          if (chunksError) {
-            console.error(`Error fetching chunks for document ${id}:`, chunksError)
-            return NextResponse.json({ chunks: [], error: chunksError.message })
+          if (error) {
+            console.error(`Error fetching chunks for document ${id}:`, error)
+            return NextResponse.json({
+              chunks: [],
+              error: error.message,
+              status: "error",
+            })
           }
 
-          return NextResponse.json({ chunks: chunksData || [] })
+          return NextResponse.json({
+            chunks: data || [],
+            status: "success",
+          })
         } catch (error) {
           console.error(`Error in chunks request for document ${id}:`, error)
           return NextResponse.json({
             chunks: [],
-            error: "Error fetching document chunks",
+            status: "error",
+            message: error instanceof Error ? error.message : "Unknown error",
           })
         }
 
       case "vectors":
         if (!id) {
-          return NextResponse.json({ error: "Document ID is required", vectors: [] }, { status: 400 })
+          return NextResponse.json(
+            {
+              error: "Document ID is required",
+              vectors: [],
+              status: "error",
+            },
+            { status: 400 },
+          )
         }
 
         try {
-          const { data: vectorsData, error: vectorsError } = await getDocumentVectors(id)
+          const { data, error } = await getDocumentVectors(id)
 
-          if (vectorsError) {
-            console.error(`Error fetching vectors for document ${id}:`, vectorsError)
-            return NextResponse.json({ vectors: [], error: vectorsError.message })
+          if (error) {
+            console.error(`Error fetching vectors for document ${id}:`, error)
+            return NextResponse.json({
+              vectors: [],
+              error: error.message,
+              status: "error",
+            })
           }
 
-          return NextResponse.json({ vectors: vectorsData || [] })
+          return NextResponse.json({
+            vectors: data || [],
+            status: "success",
+          })
         } catch (error) {
           console.error(`Error in vectors request for document ${id}:`, error)
           return NextResponse.json({
             vectors: [],
-            error: "Error fetching document vectors",
+            status: "error",
+            message: error instanceof Error ? error.message : "Unknown error",
           })
         }
 
@@ -77,16 +107,21 @@ export async function GET(req: NextRequest) {
               // Return empty document with error
               return NextResponse.json({
                 document: null,
-                error: `Error fetching document: ${error.message}`,
+                status: "error",
+                message: error.message,
               })
             }
 
-            return NextResponse.json({ document: data })
+            return NextResponse.json({
+              document: data,
+              status: "success",
+            })
           } catch (error) {
             console.error(`Error in document request for ID ${id}:`, error)
             return NextResponse.json({
               document: null,
-              error: "Error fetching document",
+              status: "error",
+              message: error instanceof Error ? error.message : "Unknown error",
             })
           }
         } else {
@@ -96,15 +131,23 @@ export async function GET(req: NextRequest) {
             if (error) {
               console.error("Error fetching documents:", error)
               // Return mock documents instead of error
-              return NextResponse.json({ documents: MOCK_DOCUMENTS })
+              return NextResponse.json({
+                documents: MOCK_DOCUMENTS,
+                status: "error",
+                message: error.message,
+              })
             }
 
-            return NextResponse.json({ documents: data || [] })
+            return NextResponse.json({
+              documents: data || [],
+              status: "success",
+            })
           } catch (error) {
             console.error("Error in documents request:", error)
             return NextResponse.json({
               documents: MOCK_DOCUMENTS,
-              error: "Error fetching documents",
+              status: "error",
+              message: error instanceof Error ? error.message : "Unknown error",
             })
           }
         }
@@ -114,7 +157,8 @@ export async function GET(req: NextRequest) {
     // Always return JSON, even on error
     return NextResponse.json({
       documents: MOCK_DOCUMENTS,
-      error: "Error processing documents request",
+      status: "error",
+      message: error instanceof Error ? error.message : "Unknown error",
     })
   }
 }
@@ -133,7 +177,14 @@ export async function POST(req: NextRequest) {
     const { title, content, category, version } = body
 
     if (!title || !content) {
-      return NextResponse.json({ error: "Title and content are required", document: null }, { status: 400 })
+      return NextResponse.json(
+        {
+          error: "Title and content are required",
+          document: null,
+          status: "error",
+        },
+        { status: 400 },
+      )
     }
 
     const { data, error } = await createDocument({
@@ -150,18 +201,27 @@ export async function POST(req: NextRequest) {
         {
           error: error.message,
           document: null,
+          status: "error",
         },
         { status: 500 },
       )
     }
 
-    return NextResponse.json({ document: data }, { status: 201 })
+    return NextResponse.json(
+      {
+        document: data,
+        status: "success",
+      },
+      { status: 201 },
+    )
   } catch (error) {
     console.error("Error in POST /api/documents:", error)
     return NextResponse.json(
       {
         error: "Error creating document",
         document: null,
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     )
@@ -175,7 +235,14 @@ export async function PUT(req: NextRequest) {
     const id = searchParams.get("id")
 
     if (!id) {
-      return NextResponse.json({ error: "Document ID is required", document: null }, { status: 400 })
+      return NextResponse.json(
+        {
+          error: "Document ID is required",
+          document: null,
+          status: "error",
+        },
+        { status: 400 },
+      )
     }
 
     const body = await req.json()
@@ -187,18 +254,24 @@ export async function PUT(req: NextRequest) {
         {
           error: error.message,
           document: null,
+          status: "error",
         },
         { status: 500 },
       )
     }
 
-    return NextResponse.json({ document: data })
+    return NextResponse.json({
+      document: data,
+      status: "success",
+    })
   } catch (error) {
     console.error("Error in PUT /api/documents:", error)
     return NextResponse.json(
       {
         error: "Error updating document",
         document: null,
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     )
@@ -212,7 +285,14 @@ export async function DELETE(req: NextRequest) {
     const id = searchParams.get("id")
 
     if (!id) {
-      return NextResponse.json({ error: "Document ID is required", success: false }, { status: 400 })
+      return NextResponse.json(
+        {
+          error: "Document ID is required",
+          success: false,
+          status: "error",
+        },
+        { status: 400 },
+      )
     }
 
     const { error, success } = await deleteDocument(id)
@@ -223,18 +303,24 @@ export async function DELETE(req: NextRequest) {
         {
           error: error.message,
           success: false,
+          status: "error",
         },
         { status: 500 },
       )
     }
 
-    return NextResponse.json({ success })
+    return NextResponse.json({
+      success,
+      status: "success",
+    })
   } catch (error) {
     console.error("Error in DELETE /api/documents:", error)
     return NextResponse.json(
       {
         error: "Error deleting document",
         success: false,
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     )

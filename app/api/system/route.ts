@@ -19,19 +19,30 @@ export async function GET(req: NextRequest) {
     switch (type) {
       case "stats":
         try {
-          const { data: statsData, error: statsError } = await getSystemStats()
+          const { data, error } = await getSystemStats()
 
-          if (statsError) {
-            console.error("Stats error:", statsError)
+          if (error) {
+            console.error("Stats error:", error)
             // Return mock stats instead of error
-            return NextResponse.json(MOCK_STATS)
+            return NextResponse.json({
+              ...MOCK_STATS,
+              status: "error",
+              message: error instanceof Error ? error.message : "Unknown error",
+            })
           }
 
-          return NextResponse.json(statsData)
+          return NextResponse.json({
+            ...data,
+            status: "success",
+          })
         } catch (error) {
           console.error("Error getting system stats:", error)
           // Return mock stats on error
-          return NextResponse.json(MOCK_STATS)
+          return NextResponse.json({
+            ...MOCK_STATS,
+            status: "error",
+            message: error instanceof Error ? error.message : "Unknown error",
+          })
         }
 
       case "diagnostics":
@@ -42,7 +53,10 @@ export async function GET(req: NextRequest) {
             const dbStatus = await checkDatabaseConnection()
 
             if (target === "database") {
-              return NextResponse.json(dbStatus)
+              return NextResponse.json({
+                ...dbStatus,
+                status: dbStatus.connected ? "success" : "error",
+              })
             }
           }
 
@@ -50,7 +64,10 @@ export async function GET(req: NextRequest) {
             const pineconeStatus = await checkPineconeConnection()
 
             if (target === "pinecone") {
-              return NextResponse.json(pineconeStatus)
+              return NextResponse.json({
+                ...pineconeStatus,
+                status: pineconeStatus.connected ? "success" : "error",
+              })
             }
           }
 
@@ -59,43 +76,61 @@ export async function GET(req: NextRequest) {
             const pineconeStatus = await checkPineconeConnection()
 
             return NextResponse.json({
-              database: dbStatus,
-              pinecone: pineconeStatus,
+              database: {
+                ...dbStatus,
+                status: dbStatus.connected ? "success" : "error",
+              },
+              pinecone: {
+                ...pineconeStatus,
+                status: pineconeStatus.connected ? "success" : "error",
+              },
+              status: dbStatus.connected && pineconeStatus.connected ? "success" : "error",
             })
           }
 
-          return NextResponse.json({ error: "Invalid target" }, { status: 400 })
+          return NextResponse.json(
+            {
+              error: "Invalid target",
+              status: "error",
+            },
+            { status: 400 },
+          )
         } catch (error) {
           console.error("Error in diagnostics:", error)
           // Return mock diagnostics data on error
           return NextResponse.json({
-            database: { status: "unknown", message: "Error checking database" },
-            pinecone: { status: "unknown", message: "Error checking Pinecone" },
+            database: { status: "error", message: "Error checking database" },
+            pinecone: { status: "error", message: "Error checking Pinecone" },
+            status: "error",
+            message: error instanceof Error ? error.message : "Unknown error",
           })
         }
 
       case "health":
       default:
         try {
-          const { data: healthData, error: healthError } = await getHealthStatus()
+          const { data, error } = await getHealthStatus()
 
-          if (healthError) {
-            console.error("Health error:", healthError)
+          if (error) {
+            console.error("Health error:", error)
             // Return mock health data instead of error
             return NextResponse.json({
-              status: "unknown",
-              message: "Error checking health status",
+              status: "error",
+              message: error instanceof Error ? error.message : "Unknown error",
               timestamp: new Date().toISOString(),
             })
           }
 
-          return NextResponse.json(healthData)
+          return NextResponse.json({
+            ...data,
+            status: data.status === "healthy" ? "success" : "error",
+          })
         } catch (error) {
           console.error("Error checking health status:", error)
           // Return mock health data on error
           return NextResponse.json({
-            status: "unknown",
-            message: "Error checking health status",
+            status: "error",
+            message: error instanceof Error ? error.message : "Unknown error",
             timestamp: new Date().toISOString(),
           })
         }
@@ -105,7 +140,7 @@ export async function GET(req: NextRequest) {
     // Return generic system status on error
     return NextResponse.json({
       status: "error",
-      message: "Error processing system request",
+      message: error instanceof Error ? error.message : "Unknown error",
       timestamp: new Date().toISOString(),
     })
   }

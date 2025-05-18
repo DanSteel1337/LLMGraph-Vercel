@@ -1,38 +1,34 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getCategoryDistribution } from "@/lib/api-handlers/analytics"
 import { MOCK_CATEGORY_DISTRIBUTION } from "@/lib/mock-data"
 
 export const runtime = "nodejs" // Use Node.js runtime for Supabase
 
 export async function GET() {
   try {
-    const supabase = createClient()
-
-    // Query to get document counts by category
-    const { data, error } = await supabase
-      .from("documents")
-      .select("category, count")
-      .order("count", { ascending: false })
-      .group("category")
+    const { data, error } = await getCategoryDistribution()
 
     if (error) {
       console.error("Error fetching category distribution:", error)
       // Return mock data instead of error
-      return NextResponse.json({ categories: MOCK_CATEGORY_DISTRIBUTION })
+      return NextResponse.json({
+        categories: MOCK_CATEGORY_DISTRIBUTION,
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      })
     }
 
-    // If no data, return mock data
-    if (!data || data.length === 0) {
-      return NextResponse.json({ categories: MOCK_CATEGORY_DISTRIBUTION })
-    }
-
-    return NextResponse.json({ categories: data })
+    return NextResponse.json({
+      categories: data || MOCK_CATEGORY_DISTRIBUTION,
+      status: "success",
+    })
   } catch (error) {
     console.error("Error in category distribution API:", error)
     // Always return JSON, even on error
     return NextResponse.json({
       categories: MOCK_CATEGORY_DISTRIBUTION,
-      error: "An error occurred while fetching category distribution",
+      status: "error",
+      message: error instanceof Error ? error.message : "Unknown error",
     })
   }
 }

@@ -1,15 +1,12 @@
-/**
- * Search API Handlers
- * Centralizes all search-related API functionality
- */
 import { createClient } from "@/lib/supabase/server"
-import { searchDocuments as performSearch } from "@/lib/ai/hybrid-search"
+import { performSearch as hybridSearch } from "@/lib/search"
+import { MOCK_POPULAR_SEARCHES, MOCK_SEARCH_TRENDS } from "@/lib/mock-data"
 
 // Search documents
-export async function searchDocuments(query: string, filters?: any) {
+export async function performSearch(query: string, filters?: any) {
   try {
-    const results = await performSearch(query, filters)
-    return { data: results }
+    const results = await hybridSearch(query, filters)
+    return { results }
   } catch (error) {
     console.error("Error searching documents:", error)
     return { error }
@@ -38,9 +35,55 @@ export async function trackSearch(query: string, userId?: string) {
   }
 }
 
+// Get popular searches
+export async function getPopularSearches(limit = 10) {
+  try {
+    // Check if we should use mock data
+    if (process.env.USE_MOCK_DATA === "true") {
+      return { data: MOCK_POPULAR_SEARCHES }
+    }
+
+    const supabase = createClient()
+
+    // Get the most popular searches
+    const { data, error } = await supabase
+      .from("search_history")
+      .select("query")
+      .order("created_at", { ascending: false })
+      .limit(100) // Get more than we need for processing
+
+    if (error) {
+      throw error
+    }
+
+    // Count occurrences of each query
+    const queryCounts: Record<string, number> = {}
+    data.forEach((item) => {
+      const query = item.query.toLowerCase().trim()
+      queryCounts[query] = (queryCounts[query] || 0) + 1
+    })
+
+    // Convert to array and sort by count
+    const popularSearches = Object.entries(queryCounts)
+      .map(([query, count]) => ({ query, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit)
+
+    return { data: popularSearches }
+  } catch (error) {
+    console.error("Error fetching popular searches:", error)
+    return { data: MOCK_POPULAR_SEARCHES, error }
+  }
+}
+
 // Get search trends
 export async function getSearchTrends(days = 7) {
   try {
+    // Check if we should use mock data
+    if (process.env.USE_MOCK_DATA === "true") {
+      return { data: MOCK_SEARCH_TRENDS }
+    }
+
     const supabase = createClient()
 
     // Get search trends for the specified number of days
@@ -79,42 +122,6 @@ export async function getSearchTrends(days = 7) {
     return { data: trends }
   } catch (error) {
     console.error("Error fetching search trends:", error)
-    return { error }
-  }
-}
-
-// Get popular searches
-export async function getPopularSearches(limit = 10) {
-  try {
-    const supabase = createClient()
-
-    // Get the most popular searches
-    const { data, error } = await supabase
-      .from("search_history")
-      .select("query")
-      .order("created_at", { ascending: false })
-      .limit(100) // Get more than we need for processing
-
-    if (error) {
-      throw error
-    }
-
-    // Count occurrences of each query
-    const queryCounts: Record<string, number> = {}
-    data.forEach((item) => {
-      const query = item.query.toLowerCase().trim()
-      queryCounts[query] = (queryCounts[query] || 0) + 1
-    })
-
-    // Convert to array and sort by count
-    const popularSearches = Object.entries(queryCounts)
-      .map(([query, count]) => ({ query, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, limit)
-
-    return { data: popularSearches }
-  } catch (error) {
-    console.error("Error fetching popular searches:", error)
-    return { error }
+    return { data: MOCK_SEARCH_TRENDS, error }
   }
 }

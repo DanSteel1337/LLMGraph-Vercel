@@ -7,7 +7,7 @@ import { logError } from "@/lib/error-handler"
  * @param filters Optional filters to apply to the search
  * @returns Search results
  */
-export async function performHybridSearch(query: string, filters = {}) {
+export async function performSearch(query: string, filters = {}) {
   try {
     // Use the consolidated AI SDK for embeddings search
     const results = await searchSimilarDocuments(query, filters)

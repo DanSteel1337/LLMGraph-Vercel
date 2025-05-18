@@ -16,6 +16,7 @@ export async function GET() {
         success: false,
         message: "Database connection failed",
         error: error.message,
+        status: "error",
       })
     }
 
@@ -23,6 +24,7 @@ export async function GET() {
       success: true,
       message: "Database connection successful",
       data,
+      status: "success",
     })
   } catch (error) {
     console.error("Error testing database connection:", error)
@@ -31,6 +33,7 @@ export async function GET() {
       success: false,
       message: "Database connection test failed",
       error: error instanceof Error ? error.message : "Unknown error",
+      status: "error",
     })
   }
 }
