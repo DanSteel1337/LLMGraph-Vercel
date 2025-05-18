@@ -161,3 +161,16 @@ export function shouldUseMockData(): boolean {
   // Use mock data in development or when explicitly enabled
   return process.env.NODE_ENV === "development" || process.env.USE_MOCK_DATA === "true"
 }
+
+// Helper function to ensure array return type
+export function ensureArray<T>(data: T | T[] | null | undefined, fallback: T[] = []): T[] {
+  if (Array.isArray(data)) {
+    return data.length > 0 ? data : fallback
+  }
+  return data ? [data] : fallback
+}
+
+// Helper function to ensure object return type
+export function ensureObject<T extends object>(data: T | null | undefined, fallback: T): T {
+  return data || fallback
+}

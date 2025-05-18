@@ -1,54 +1,7 @@
 "use client"
 
-import { Suspense } from "react"
-import dynamic from "next/dynamic"
-import { Skeleton } from "@/components/ui/skeleton"
+import { DocumentUploadForm } from "@/components/upload/document-upload-form"
 
-// Import the form component with dynamic import and explicitly disable SSR
-const DocumentUploadForm = dynamic(
-  () => import("./document-upload-form").then((mod) => ({ default: mod.DocumentUploadForm })),
-  {
-    ssr: false,
-    loading: () => <UploadFormSkeleton />,
-  },
-)
-
-// Loading fallback component
-function UploadFormSkeleton() {
-  return (
-    <div className="space-y-6">
-      <Skeleton className="h-8 w-3/4" />
-      <Skeleton className="h-4 w-1/2" />
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-1/4" />
-          <Skeleton className="h-10 w-full" />
-        </div>
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-1/4" />
-          <Skeleton className="h-10 w-full" />
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-1/4" />
-        <Skeleton className="h-24 w-full" />
-      </div>
-      <div className="flex justify-between">
-        <Skeleton className="h-10 w-24" />
-        <Skeleton className="h-10 w-36" />
-      </div>
-    </div>
-  )
-}
-
-// Change from default export to named export to match import expectations
-export { DocumentUploadFormWrapper }
-
-// The actual component
-function DocumentUploadFormWrapper() {
-  return (
-    <Suspense fallback={<UploadFormSkeleton />}>
-      <DocumentUploadForm />
-    </Suspense>
-  )
+export function DocumentUploadFormWrapper() {
+  return <DocumentUploadForm />
 }

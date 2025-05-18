@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createPineconeClient } from "@/lib/pinecone/client"
+import { validateEnvVar } from "@/lib/env-validator"
+import { logError } from "@/lib/error-handler"
 
 // Type for system stats response
 interface SystemStats {
@@ -61,6 +63,10 @@ interface ApiResponse<T> {
  */
 export async function getSystemStats(): Promise<ApiResponse<SystemStats>> {
   try {
+    // Validate environment variables
+    validateEnvVar("NEXT_PUBLIC_SUPABASE_URL")
+    validateEnvVar("SUPABASE_SERVICE_ROLE_KEY")
+
     const supabase = createClient()
     const startTime = Date.now()
 
@@ -70,6 +76,7 @@ export async function getSystemStats(): Promise<ApiResponse<SystemStats>> {
       .select("*", { count: "exact", head: true })
 
     if (documentError) {
+      logError(documentError, "system_stats_document_count_error")
       throw new Error(`Failed to get document count: ${documentError.message}`)
     }
 
@@ -79,6 +86,7 @@ export async function getSystemStats(): Promise<ApiResponse<SystemStats>> {
       .select("*", { count: "exact", head: true })
 
     if (searchError) {
+      logError(searchError, "system_stats_search_count_error")
       throw new Error(`Failed to get search count: ${searchError.message}`)
     }
 
@@ -88,6 +96,7 @@ export async function getSystemStats(): Promise<ApiResponse<SystemStats>> {
       .select("*", { count: "exact", head: true })
 
     if (userError) {
+      logError(userError, "system_stats_user_count_error")
       throw new Error(`Failed to get user count: ${userError.message}`)
     }
 
@@ -108,7 +117,7 @@ export async function getSystemStats(): Promise<ApiResponse<SystemStats>> {
       },
     }
   } catch (error) {
-    console.error("Error getting system stats:", error)
+    logError(error, "system_stats_error")
     return {
       data: {
         totalDocuments: 125, // Mock data
@@ -130,6 +139,10 @@ export async function getSystemStats(): Promise<ApiResponse<SystemStats>> {
  */
 export async function checkDatabaseConnection(): Promise<DatabaseConnectionStatus> {
   try {
+    // Validate environment variables
+    validateEnvVar("NEXT_PUBLIC_SUPABASE_URL")
+    validateEnvVar("SUPABASE_SERVICE_ROLE_KEY")
+
     const startTime = Date.now()
     const supabase = createClient()
 
@@ -140,6 +153,7 @@ export async function checkDatabaseConnection(): Promise<DatabaseConnectionStatu
     const latency = endTime - startTime
 
     if (error) {
+      logError(error, "database_connection_check_error")
       return {
         connected: false,
         latency,
@@ -155,6 +169,7 @@ export async function checkDatabaseConnection(): Promise<DatabaseConnectionStatu
       timestamp: new Date().toISOString(),
     }
   } catch (error) {
+    logError(error, "database_connection_check_error")
     return {
       connected: false,
       latency: 0,
@@ -170,6 +185,10 @@ export async function checkDatabaseConnection(): Promise<DatabaseConnectionStatu
  */
 export async function checkPineconeConnection(): Promise<PineconeConnectionStatus> {
   try {
+    // Validate environment variables
+    validateEnvVar("PINECONE_API_KEY")
+    validateEnvVar("PINECONE_INDEX_NAME")
+
     const startTime = Date.now()
     const pinecone = createPineconeClient()
 
@@ -197,6 +216,7 @@ export async function checkPineconeConnection(): Promise<PineconeConnectionStatu
       indexes: indexes.map((index) => index.name),
     }
   } catch (error) {
+    logError(error, "pinecone_connection_check_error")
     return {
       connected: false,
       latency: 0,
@@ -251,7 +271,7 @@ export async function getHealthStatus(): Promise<ApiResponse<HealthStatus>> {
       },
     }
   } catch (error) {
-    console.error("Error getting health status:", error)
+    logError(error, "health_status_check_error")
     return {
       data: {
         status: "degraded",

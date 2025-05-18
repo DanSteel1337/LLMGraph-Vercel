@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
+import { createServerClient } from "@/lib/supabase/server"
+import { logError } from "@/lib/error-handler"
 
 // Define protected routes that require authentication
 const protectedRoutes = ["/documents", "/upload", "/admin", "/settings"]
@@ -11,42 +12,49 @@ let hasLoggedNoSession = false
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
 
-  // Create a Supabase client for the middleware
-  const supabase = createMiddlewareClient({ req, res })
+  try {
+    // Create a Supabase client for the middleware
+    const supabase = createServerClient()
 
-  // Check if the user is authenticated
-  const {
-    data: { session },
-    error,
-  } = await supabase.auth.getSession()
+    // Check if the user is authenticated
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession()
 
-  if (error) {
-    // Only log in development
-    if (process.env.NODE_ENV !== "production") {
-      console.warn("[Middleware] Auth error:", error.message)
-    }
-  }
-
-  // Get the pathname from the request
-  const { pathname } = req.nextUrl
-
-  // Check if the route is protected and the user is not authenticated
-  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
-
-  if (isProtectedRoute && !session) {
-    // Only log once in production
-    if (!hasLoggedNoSession && process.env.NODE_ENV === "production") {
-      console.log("[Middleware] No active session found, redirecting to login")
-      hasLoggedNoSession = true
+    if (error) {
+      // Only log in development
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[Middleware] Auth error:", error.message)
+      }
+      logError(error, "middleware_auth_error")
     }
 
-    // Redirect to login page if not authenticated
-    const redirectUrl = new URL("/login", req.url)
-    redirectUrl.searchParams.set("redirect", pathname)
-    return NextResponse.redirect(redirectUrl)
-  }
+    // Get the pathname from the request
+    const { pathname } = req.nextUrl
 
-  return res
+    // Check if the route is protected and the user is not authenticated
+    const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
+
+    if (isProtectedRoute && !session) {
+      // Only log once in production
+      if (!hasLoggedNoSession && process.env.NODE_ENV === "production") {
+        console.log("[Middleware] No active session found, redirecting to login")
+        hasLoggedNoSession = true
+      }
+
+      // Redirect to login page if not authenticated
+      const redirectUrl = new URL("/login", req.url)
+      redirectUrl.searchParams.set("redirect", pathname)
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    return res
+  } catch (error) {
+    // Log error and continue
+    logError(error, "middleware_error")
+    return res
+  }
 }
 
 export const config = {

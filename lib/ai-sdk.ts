@@ -8,7 +8,6 @@
  * - For document processing: use lib/ai/document-processing.ts
  */
 
-import { Pinecone } from "@pinecone-database/pinecone"
 import { generateEmbedding } from "./ai/embeddings"
 import { searchWithEmbeddings as hybridSearch } from "./ai/hybrid-search"
 import {
@@ -19,39 +18,7 @@ import {
 import { getDetailedIndexStats } from "./pinecone/client"
 import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
-
-// Use environment variables
-const PINECONE_API_KEY = process.env.PINECONE_API_KEY || ""
-const PINECONE_INDEX_NAME = process.env.PINECONE_INDEX_NAME || ""
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ""
-
-// Initialize Pinecone client
-let pineconeClient: Pinecone | null = null
-
-// Get or create Pinecone client
-function getPineconeClient() {
-  if (!pineconeClient) {
-    if (!PINECONE_API_KEY) {
-      throw new Error("PINECONE_API_KEY is not defined")
-    }
-
-    pineconeClient = new Pinecone({
-      apiKey: PINECONE_API_KEY,
-    })
-  }
-  return pineconeClient
-}
-
-// Get Pinecone index
-function getPineconeIndex() {
-  const pinecone = getPineconeClient()
-
-  if (!PINECONE_INDEX_NAME) {
-    throw new Error("PINECONE_INDEX_NAME is not defined")
-  }
-
-  return pinecone.Index(PINECONE_INDEX_NAME)
-}
+import { validateEnvVar } from "./env-validator"
 
 // Generate embeddings for a text
 export async function generateEmbeddings(text: string): Promise<number[]> {
@@ -101,10 +68,13 @@ export async function processDocument(id: string, title: string, content: string
 export { insertDocumentIntoPinecone, deleteDocumentFromPinecone }
 
 // Mock data flag for testing
-export const USE_MOCK_DATA = process.env.USE_MOCK_DATA === "true"
+export const USE_MOCK_DATA = validateEnvVar("USE_MOCK_DATA", false) === "true"
 
 // Centralized AI functionality
 async function generateResponse(prompt: string, context: string) {
+  // Validate OpenAI API key
+  validateEnvVar("OPENAI_API_KEY")
+
   const { text } = await generateText({
     model: openai("gpt-4o"),
     prompt: `Context: ${context}\n\nQuestion: ${prompt}\n\nAnswer:`,

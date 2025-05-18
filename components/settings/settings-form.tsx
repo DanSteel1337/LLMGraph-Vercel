@@ -16,10 +16,12 @@ export function SettingsForm() {
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
 
+  // Use computed values for client-side settings rather than environment variables
+  // This avoids unnecessary environment configuration and deployment issues
   const [generalSettings, setGeneralSettings] = useState({
     siteName: "Vector RAG Dashboard",
     siteDescription: "A dashboard for managing vector-based RAG systems",
-    apiUrl: process.env.NEXT_PUBLIC_API_URL || "",
+    apiUrl: typeof window !== "undefined" ? `${window.location.origin}/api` : "/api",
     useMockData: process.env.USE_MOCK_DATA === "true",
   })
 
@@ -36,9 +38,35 @@ export function SettingsForm() {
     metric: "cosine",
   })
 
+  const validateSettings = (settings) => {
+    // Ensure API URL is valid
+    if (!settings.apiUrl) {
+      return { valid: false, message: "API URL cannot be empty" }
+    }
+
+    // Ensure API URL is properly formatted
+    if (!settings.apiUrl.startsWith("/api") && !settings.apiUrl.startsWith("http")) {
+      return { valid: false, message: "API URL must start with '/api' or include a full URL" }
+    }
+
+    return { valid: true }
+  }
+
   const handleSaveGeneral = async () => {
     setLoading(true)
     try {
+      // Validate settings before saving
+      const validation = validateSettings(generalSettings)
+      if (!validation.valid) {
+        toast({
+          title: "Validation Error",
+          description: validation.message,
+          variant: "destructive",
+        })
+        setLoading(false)
+        return
+      }
+
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
@@ -145,8 +173,11 @@ export function SettingsForm() {
                   id="apiUrl"
                   value={generalSettings.apiUrl}
                   onChange={(e) => setGeneralSettings({ ...generalSettings, apiUrl: e.target.value })}
-                  placeholder="https://api.example.com"
+                  placeholder="/api"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Default is "/api" or the current origin + "/api". No environment variable needed.
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <Switch

@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase/client"
-import { MOCK_CATEGORY_DISTRIBUTION, MOCK_SEARCH_TRENDS } from "@/lib/mock-data"
+import { MOCK_CATEGORY_DISTRIBUTION, MOCK_SEARCH_TRENDS, ensureArray } from "@/lib/mock-data"
 
 /**
  * Get category distribution data
@@ -23,10 +23,10 @@ export async function getCategoryDistribution() {
       return { data: MOCK_CATEGORY_DISTRIBUTION, error }
     }
 
-    // Process the data
-    const categoryData = data.map((item) => ({
+    // Process the data and ensure it's an array
+    const categoryData = ensureArray(data, MOCK_CATEGORY_DISTRIBUTION).map((item) => ({
       category: item.category || "Uncategorized",
-      count: item.count,
+      count: item.count || 0,
     }))
 
     return { data: categoryData }
@@ -84,9 +84,10 @@ export async function getSearchTrends(period = "week") {
     }
 
     // Process the data to get daily aggregates
-    const dailyData = processSearchTrendsData(data)
+    const dailyData = processSearchTrendsData(ensureArray(data, []))
 
-    return { data: dailyData }
+    // If no data was found, return mock data
+    return { data: dailyData.length > 0 ? dailyData : MOCK_SEARCH_TRENDS }
   } catch (error) {
     console.error("Error in getSearchTrends:", error)
     return { data: MOCK_SEARCH_TRENDS, error }
@@ -101,6 +102,8 @@ function processSearchTrendsData(data: any[]) {
   const groupedByDate: Record<string, { searches: number; successes: number }> = {}
 
   data.forEach((item) => {
+    if (!item || !item.created_at) return
+
     const date = new Date(item.created_at).toISOString().split("T")[0]
 
     if (!groupedByDate[date]) {

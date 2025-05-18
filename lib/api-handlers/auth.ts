@@ -1,70 +1,63 @@
-/**
- * Auth API Handlers
- * Centralizes all authentication-related API functionality
- */
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase/server"
+import { logError } from "@/lib/error-handler"
 
-// Handle OAuth callback
+/**
+ * Handles the auth callback from Supabase
+ */
 export async function handleAuthCallback(req: NextRequest) {
   try {
     const requestUrl = new URL(req.url)
     const code = requestUrl.searchParams.get("code")
 
-    if (code) {
-      const cookieStore = cookies()
-      const supabase = createClient({ cookies: () => cookieStore })
-      await supabase.auth.exchangeCodeForSession(code)
+    if (!code) {
+      return NextResponse.redirect(new URL("/login", req.url))
     }
 
-    // URL to redirect to after sign in process completes
-    return NextResponse.redirect(requestUrl.origin)
+    const supabase = createClient()
+
+    // Exchange the code for a session
+    await supabase.auth.exchangeCodeForSession(code)
+
+    // Redirect to the dashboard or the original URL
+    const redirectTo = requestUrl.searchParams.get("redirect") || "/dashboard"
+    return NextResponse.redirect(new URL(redirectTo, req.url))
   } catch (error) {
-    console.error("Error in handleAuthCallback:", error)
-    return NextResponse.redirect(
-      new URL(
-        `/login?error=${encodeURIComponent(error instanceof Error ? error.message : "Unknown error")}`,
-        req.nextUrl.origin,
-      ),
-    )
+    logError(error, "auth_callback_error")
+    console.error("Error in auth callback:", error)
+    return NextResponse.redirect(new URL("/login?error=callback_failed", req.url))
   }
 }
 
-// Check if user is admin
+/**
+ * Gets the current session
+ */
+export async function getCurrentSession() {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.auth.getSession()
+    return { session: data.session, error }
+  } catch (error) {
+    logError(error, "get_session_error")
+    return { session: null, error: error instanceof Error ? error : new Error("Unknown error") }
+  }
+}
+
+/**
+ * Checks if a user is an admin
+ */
 export async function isUserAdmin(userId: string) {
   try {
-    // This is a placeholder. In a real application, you would check
-    // if the user has admin privileges in your database.
-    const supabase = createClient({ cookies })
+    const supabase = createClient()
     const { data, error } = await supabase.from("admins").select("*").eq("user_id", userId).single()
 
     if (error) {
-      console.error("Error checking admin status:", error)
-      return { isAdmin: false }
+      throw error
     }
 
-    return { isAdmin: !!data }
+    return { isAdmin: !!data, error: null }
   } catch (error) {
-    console.error("Error in isUserAdmin:", error)
-    return { isAdmin: false }
-  }
-}
-
-// Get current session
-export async function getCurrentSession() {
-  try {
-    const supabase = createClient({ cookies })
-    const { data, error } = await supabase.auth.getSession()
-
-    if (error) {
-      console.error("Error getting session:", error)
-      return { error }
-    }
-
-    return { session: data.session }
-  } catch (error) {
-    console.error("Error in getCurrentSession:", error)
-    return { error }
+    logError(error, "admin_check_error")
+    return { isAdmin: false, error: error instanceof Error ? error : new Error("Unknown error") }
   }
 }

@@ -2,6 +2,11 @@ import { generateEmbedding } from "./embeddings"
 import { getPineconeIndex } from "@/lib/pinecone/client"
 import { buildPineconeFilters } from "@/lib/pinecone/filters"
 import { logError } from "@/lib/error-handler"
+import { validateEnvVar } from "@/lib/env-validator"
+
+// Validate required environment variables
+validateEnvVar("PINECONE_API_KEY")
+validateEnvVar("PINECONE_INDEX_NAME")
 
 // Type for search result
 export interface SearchResult {

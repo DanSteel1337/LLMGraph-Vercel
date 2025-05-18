@@ -7,14 +7,32 @@ export function cn(...classes: (string | undefined | null | false)[]): string {
 
 /**
  * Formats a date to a readable string
+ * @param date - Date object or date string to format
+ * @param fallback - Optional fallback string to return if date is invalid (defaults to 'Invalid Date')
+ * @returns Formatted date string or fallback value
  */
-export function formatDate(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date
-  return d.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  })
+export function formatDate(date: Date | string | null | undefined, fallback = "Invalid Date"): string {
+  if (date === null || date === undefined) {
+    return fallback
+  }
+
+  try {
+    const d = typeof date === "string" ? new Date(date) : date
+
+    // Check if date is valid
+    if (isNaN(d.getTime())) {
+      return fallback
+    }
+
+    return d.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+  } catch (error) {
+    console.error("Error formatting date:", error)
+    return fallback
+  }
 }
 
 /**

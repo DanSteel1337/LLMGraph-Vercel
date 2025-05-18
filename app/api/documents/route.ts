@@ -46,8 +46,11 @@ export async function GET(req: NextRequest) {
             })
           }
 
+          // Ensure we always return an array
+          const chunks = Array.isArray(data) ? data : data ? [data] : []
+
           return NextResponse.json({
-            chunks: data || [],
+            chunks,
             status: "success",
           })
         } catch (error) {
@@ -83,8 +86,11 @@ export async function GET(req: NextRequest) {
             })
           }
 
+          // Ensure we always return an array
+          const vectors = Array.isArray(data) ? data : data ? [data] : []
+
           return NextResponse.json({
-            vectors: data || [],
+            vectors,
             status: "success",
           })
         } catch (error) {
@@ -138,8 +144,11 @@ export async function GET(req: NextRequest) {
               })
             }
 
+            // Ensure we always return an array
+            const documents = Array.isArray(data) ? data : data ? [data] : MOCK_DOCUMENTS
+
             return NextResponse.json({
-              documents: data || [],
+              documents,
               status: "success",
             })
           } catch (error) {

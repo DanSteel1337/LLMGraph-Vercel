@@ -18,6 +18,7 @@ interface SearchResult {
     page?: number
     category?: string
     version?: string
+    created_at?: string
     [key: string]: any
   }
 }
@@ -124,90 +125,91 @@ export default function SearchResults({ results, query, onFeedback }: SearchResu
 
   return (
     <div className="space-y-4">
-      {results.map((result) => (
-        <Card key={result.id} className="overflow-hidden">
-          <CardHeader className="pb-2">
-            <div className="flex justify-between items-start">
-              <CardTitle className="text-lg">{result.title || "Untitled Document"}</CardTitle>
-              <Badge variant="outline" className="ml-2">
-                {Math.round(result.score * 100)}%
-              </Badge>
-            </div>
-            <CardDescription>
-              {result.metadata.source && (
-                <span className="inline-flex items-center mr-3">
-                  <ExternalLink className="h-3 w-3 mr-1" />
-                  {result.metadata.source}
-                  {result.metadata.page && ` (p.${result.metadata.page})`}
-                </span>
-              )}
-              {result.metadata.category && (
-                <Badge variant="secondary" className="mr-2">
-                  {result.metadata.category}
+      {Array.isArray(results) &&
+        results.map((result) => (
+          <Card key={result.id} className="overflow-hidden">
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-start">
+                <CardTitle className="text-lg">{result.title || "Untitled Document"}</CardTitle>
+                <Badge variant="outline" className="ml-2">
+                  {Math.round(result.score * 100)}%
                 </Badge>
-              )}
-              {result.metadata.version && <Badge variant="outline">v{result.metadata.version}</Badge>}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pb-2">
-            <Collapsible open={expandedResults[result.id] || false}>
-              <div className="text-sm text-muted-foreground">
-                {!expandedResults[result.id] ? (
-                  <p>{highlightText(getContentSnippet(result.content, query), query)}</p>
-                ) : (
-                  <p>{highlightText(result.content, query)}</p>
-                )}
               </div>
-              <CollapsibleTrigger asChild>
+              <CardDescription>
+                {result.metadata.source && (
+                  <span className="inline-flex items-center mr-3">
+                    <ExternalLink className="h-3 w-3 mr-1" />
+                    {result.metadata.source}
+                    {result.metadata.page && ` (p.${result.metadata.page})`}
+                  </span>
+                )}
+                {result.metadata.category && (
+                  <Badge variant="secondary" className="mr-2">
+                    {result.metadata.category}
+                  </Badge>
+                )}
+                {result.metadata.version && <Badge variant="outline">v{result.metadata.version}</Badge>}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pb-2">
+              <Collapsible open={expandedResults[result.id] || false}>
+                <div className="text-sm text-muted-foreground">
+                  {!expandedResults[result.id] ? (
+                    <p>{highlightText(getContentSnippet(result.content, query), query)}</p>
+                  ) : (
+                    <p>{highlightText(result.content, query)}</p>
+                  )}
+                </div>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 w-full flex items-center justify-center"
+                    onClick={() => toggleExpand(result.id)}
+                  >
+                    {expandedResults[result.id] ? (
+                      <>
+                        <ChevronUp className="h-4 w-4 mr-1" />
+                        Show Less
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4 mr-1" />
+                        Show More
+                      </>
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>{/* Additional content shown when expanded */}</CollapsibleContent>
+              </Collapsible>
+            </CardContent>
+            <CardFooter className="pt-1 flex justify-between">
+              <div className="text-xs text-muted-foreground">ID: {result.id.substring(0, 8)}...</div>
+              <div className="flex space-x-2">
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="mt-2 w-full flex items-center justify-center"
-                  onClick={() => toggleExpand(result.id)}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => handleFeedback(result.id, true)}
+                  disabled={feedbackGiven[result.id]}
+                  title="This was helpful"
                 >
-                  {expandedResults[result.id] ? (
-                    <>
-                      <ChevronUp className="h-4 w-4 mr-1" />
-                      Show Less
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="h-4 w-4 mr-1" />
-                      Show More
-                    </>
-                  )}
+                  <ThumbsUp className="h-4 w-4" />
                 </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>{/* Additional content shown when expanded */}</CollapsibleContent>
-            </Collapsible>
-          </CardContent>
-          <CardFooter className="pt-1 flex justify-between">
-            <div className="text-xs text-muted-foreground">ID: {result.id.substring(0, 8)}...</div>
-            <div className="flex space-x-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => handleFeedback(result.id, true)}
-                disabled={feedbackGiven[result.id]}
-                title="This was helpful"
-              >
-                <ThumbsUp className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => handleFeedback(result.id, false)}
-                disabled={feedbackGiven[result.id]}
-                title="This was not helpful"
-              >
-                <ThumbsDown className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardFooter>
-        </Card>
-      ))}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => handleFeedback(result.id, false)}
+                  disabled={feedbackGiven[result.id]}
+                  title="This was not helpful"
+                >
+                  <ThumbsDown className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardFooter>
+          </Card>
+        ))}
     </div>
   )
 }

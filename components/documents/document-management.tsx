@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
-import { createSafeClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase/client"
 import { DocumentEditDialog } from "./document-edit-dialog"
 
 export type Document = {
@@ -114,12 +114,6 @@ export function DocumentManagement() {
           return
         }
 
-        // Use Supabase client directly instead of deprecated function
-        const supabase = createSafeClient()
-        if (!supabase) {
-          throw new Error("Supabase client not available")
-        }
-
         const { data, error } = await supabase.from("documents").select("*").order("created_at", { ascending: false })
 
         if (error) {
@@ -161,7 +155,7 @@ export function DocumentManagement() {
 
   const handleDeleteDocument = async (id: string) => {
     try {
-      // Use Supabase client directly instead of deprecated function
+      // Use mock data if environment variable is set
       if (process.env.USE_MOCK_DATA === "true") {
         // Just remove from local state for mock data
         setDocuments(documents.filter((doc) => doc.id !== id))
@@ -170,11 +164,6 @@ export function DocumentManagement() {
           description: "The document has been deleted successfully.",
         })
         return
-      }
-
-      const supabase = createSafeClient()
-      if (!supabase) {
-        throw new Error("Supabase client not available")
       }
 
       const { error } = await supabase.from("documents").delete().eq("id", id)

@@ -22,8 +22,11 @@ export async function GET(req: Request) {
         })
       }
 
+      // Ensure we always return an array
+      const popularSearches = Array.isArray(data) ? data : data ? [data] : MOCK_POPULAR_SEARCHES
+
       return NextResponse.json({
-        popularSearches: data || MOCK_POPULAR_SEARCHES,
+        popularSearches,
         status: "success",
       })
     }
@@ -41,8 +44,11 @@ export async function GET(req: Request) {
         })
       }
 
+      // Ensure we always return an array
+      const trends = Array.isArray(data) ? data : data ? [data] : MOCK_SEARCH_TRENDS
+
       return NextResponse.json({
-        trends: data || MOCK_SEARCH_TRENDS,
+        trends,
         status: "success",
       })
     }
@@ -107,8 +113,11 @@ export async function POST(req: Request) {
       })
     }
 
+    // Ensure we always return an array
+    const searchResults = Array.isArray(results) ? results : results ? [results] : MOCK_SEARCH_RESULTS
+
     return NextResponse.json({
-      results: results || MOCK_SEARCH_RESULTS,
+      results: searchResults,
       status: "success",
     })
   } catch (error) {

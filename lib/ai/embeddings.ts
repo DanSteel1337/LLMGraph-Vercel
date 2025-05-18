@@ -1,3 +1,6 @@
+import { validateEnvVar } from "@/lib/env-validator"
+import { logError } from "@/lib/error-handler"
+
 /**
  * Generate embeddings for text using OpenAI
  * @param text Text to embed
@@ -5,6 +8,9 @@
  */
 export async function generateEmbeddings(text: string): Promise<number[]> {
   try {
+    // Validate OpenAI API key
+    validateEnvVar("OPENAI_API_KEY")
+
     // Dynamic import to avoid issues with server/client
     const { embed } = await import("ai")
     const { openai } = await import("@ai-sdk/openai")
@@ -16,8 +22,8 @@ export async function generateEmbeddings(text: string): Promise<number[]> {
 
     return embedding
   } catch (error) {
-    console.error("Error generating embeddings:", error)
-    throw error
+    logError(error, "embedding_generation_error")
+    throw new Error(`Failed to generate embeddings: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
 
@@ -43,8 +49,12 @@ export async function embedWithRetry(text: string, maxRetries = 3): Promise<numb
     }
   }
 
-  console.error("All embedding retries failed:", lastError)
-  throw lastError
+  logError(lastError, "embedding_retry_exhausted")
+  throw new Error(
+    `Embedding generation failed after ${maxRetries} retries: ${
+      lastError instanceof Error ? lastError.message : "Unknown error"
+    }`,
+  )
 }
 
 /**

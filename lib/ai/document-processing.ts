@@ -2,25 +2,38 @@ import { generateEmbedding } from "./embeddings"
 import { getPineconeIndex } from "@/lib/pinecone/client"
 import { getSupabaseClient } from "@/lib/supabase/client"
 import { logError } from "@/lib/error-handler"
+import { validateEnvVar } from "@/lib/env-validator"
+
+// Validate required environment variables
+validateEnvVar("PINECONE_API_KEY")
+validateEnvVar("PINECONE_INDEX_NAME")
+validateEnvVar("NEXT_PUBLIC_SUPABASE_URL")
+validateEnvVar("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 
 /**
  * Process a document for indexing
- * @param document Document to process
+ * @param id Document ID
+ * @param title Document title
+ * @param content Document content
+ * @param metadata Additional metadata
  * @returns Processed document with embeddings
  */
-export async function processDocument(document: any) {
+export async function processDocument(id: string, title: string, content: string, metadata: Record<string, any> = {}) {
   try {
-    // Validate document
-    if (!document.content || !document.title) {
-      throw new Error("Document must have content and title")
+    // Validate inputs
+    if (!id || !title || !content) {
+      throw new Error("Document ID, title, and content are required")
     }
 
     // Generate embedding for document content
-    const embedding = await generateEmbedding(document.content)
+    const embedding = await generateEmbedding(content)
 
     // Prepare document for indexing
     const processedDocument = {
-      ...document,
+      id,
+      title,
+      content,
+      ...metadata,
       embedding,
       processedAt: new Date().toISOString(),
     }
@@ -28,7 +41,7 @@ export async function processDocument(document: any) {
     return processedDocument
   } catch (error) {
     logError(error, "document_processing_error")
-    throw new Error(`Failed to process document: ${error.message}`)
+    throw new Error(`Failed to process document: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
 
@@ -66,7 +79,9 @@ export async function insertDocumentIntoPinecone(document: any) {
     return result
   } catch (error) {
     logError(error, "pinecone_insert_error")
-    throw new Error(`Failed to insert document into Pinecone: ${error.message}`)
+    throw new Error(
+      `Failed to insert document into Pinecone: ${error instanceof Error ? error.message : "Unknown error"}`,
+    )
   }
 }
 
@@ -95,7 +110,9 @@ export async function deleteDocumentFromPinecone(documentId: string) {
     return result
   } catch (error) {
     logError(error, "pinecone_delete_error")
-    throw new Error(`Failed to delete document from Pinecone: ${error.message}`)
+    throw new Error(
+      `Failed to delete document from Pinecone: ${error instanceof Error ? error.message : "Unknown error"}`,
+    )
   }
 }
 
@@ -148,7 +165,12 @@ export async function batchProcessDocuments(documents: any[]) {
 
   for (const document of documents) {
     try {
-      const processedDocument = await processDocument(document)
+      const processedDocument = await processDocument(
+        document.id,
+        document.title,
+        document.content,
+        document.metadata || {},
+      )
       const insertResult = await insertDocumentIntoPinecone(processedDocument)
       results.push({
         documentId: document.id,
@@ -160,7 +182,7 @@ export async function batchProcessDocuments(documents: any[]) {
       errors.push({
         documentId: document.id,
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : "Unknown error",
       })
     }
   }

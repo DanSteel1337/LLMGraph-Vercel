@@ -41,14 +41,53 @@ export function EnvVarChecker() {
             <div className="space-y-1">
               <div className="text-sm font-medium">Connection Test</div>
               <div className="flex items-center text-sm">
-                {results.success ? (
+                {results.connectionTest.success ? (
                   <CheckCircle className="mr-1 h-4 w-4 text-green-500" />
                 ) : (
                   <AlertCircle className="mr-1 h-4 w-4 text-red-500" />
                 )}
-                {results.message}
+                {results.connectionTest.message}
               </div>
-              {results.error && <div className="text-xs text-red-500">{results.error}</div>}
+              {results.connectionTest.error && (
+                <div className="text-xs text-red-500">{results.connectionTest.error}</div>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <div className="text-sm font-medium">Environment Variables</div>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <div>Supabase URL:</div>
+                <div
+                  className={results.environmentVariables.supabaseUrl.includes("✓") ? "text-green-500" : "text-red-500"}
+                >
+                  {results.environmentVariables.supabaseUrl}
+                </div>
+                <div>Supabase Key:</div>
+                <div
+                  className={results.environmentVariables.supabaseKey.includes("✓") ? "text-green-500" : "text-red-500"}
+                >
+                  {results.environmentVariables.supabaseKey}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="text-sm font-medium">Tables</div>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                {Object.entries(results.tablesTest).map(([table, info]: [string, any]) => (
+                  <>
+                    <div key={`${table}-name`}>{table}:</div>
+                    <div key={`${table}-status`} className={info.exists ? "text-green-500" : "text-red-500"}>
+                      {info.exists ? "✓ Exists" : "✗ Not found"}
+                    </div>
+                    {info.error && (
+                      <div key={`${table}-error`} className="col-span-2 text-red-500">
+                        Error: {info.error}
+                      </div>
+                    )}
+                  </>
+                ))}
+              </div>
             </div>
           </div>
         )}

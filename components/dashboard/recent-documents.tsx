@@ -111,13 +111,14 @@ export function RecentDocuments({ limit = 5 }: RecentDocumentsProps) {
       {error && <div>{error}</div>}
       {!isLoading && !error && (
         <ul>
-          {documents.map((doc) => (
-            <li key={doc.id}>
-              <h3>{doc.title}</h3>
-              <p>{doc.category}</p>
-              <p>{formatDate(doc.created_at)}</p>
-            </li>
-          ))}
+          {Array.isArray(documents) &&
+            documents.map((doc) => (
+              <li key={doc.id}>
+                <h3>{doc.title}</h3>
+                <p>{doc.category}</p>
+                <p>{formatDate(doc?.created_at, "N/A")}</p>
+              </li>
+            ))}
         </ul>
       )}
     </div>

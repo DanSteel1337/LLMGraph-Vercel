@@ -1,65 +1,64 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { supabase } from "@/lib/supabase/client"
-import type { User, Session } from "@supabase/supabase-js"
+import { useState, useEffect } from "react"
+import { useSupabase } from "@/lib/supabase/provider"
+import { useRouter } from "next/navigation"
+import { logError } from "@/lib/error-handler"
 
 export function useAuthState() {
-  const [user, setUser] = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { supabase, user, loading } = useSupabase()
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true)
+  const router = useRouter()
 
-  // Track auth subscription
-  const authSubscription = useRef<{ unsubscribe: () => void } | null>(null)
-
+  // Check if user is admin
   useEffect(() => {
-    // Only run on client side
-    if (typeof window === "undefined") return
+    async function checkAdminStatus() {
+      if (!user) {
+        setIsAdmin(false)
+        setIsCheckingAdmin(false)
+        return
+      }
 
-    // Clean up previous subscription
-    if (authSubscription.current?.unsubscribe) {
-      authSubscription.current.unsubscribe()
-      authSubscription.current = null
-    }
-
-    // Initial session fetch
-    const getInitialSession = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession()
+        const { data, error } = await supabase.from("admins").select("*").eq("user_id", user.id).single()
 
         if (error) {
-          console.warn("Error fetching initial session:", error.message)
+          throw error
         }
 
-        setSession(data.session)
-        setUser(data.session?.user || null)
+        setIsAdmin(!!data)
       } catch (error) {
-        console.error("Failed to get initial session:", error)
+        logError(error, "admin_check_error")
+        setIsAdmin(false)
       } finally {
-        setLoading(false)
+        setIsCheckingAdmin(false)
       }
     }
 
-    getInitialSession()
-
-    // Set up auth state listener
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession)
-      setUser(newSession?.user || null)
-      setLoading(false)
-    })
-
-    // Store subscription reference
-    authSubscription.current = subscription
-
-    return () => {
-      // Clean up subscription
-      if (authSubscription.current?.unsubscribe) {
-        authSubscription.current.unsubscribe()
-        authSubscription.current = null
-      }
+    if (user) {
+      checkAdminStatus()
+    } else if (!loading) {
+      setIsAdmin(false)
+      setIsCheckingAdmin(false)
     }
-  }, [])
+  }, [user, loading, supabase])
 
-  return { user, session, loading }
+  // Sign out function
+  const signOut = async () => {
+    try {
+      await supabase.auth.signOut()
+      router.push("/login")
+    } catch (error) {
+      logError(error, "sign_out_error")
+      console.error("Error signing out:", error)
+    }
+  }
+
+  return {
+    user,
+    loading: loading || isCheckingAdmin,
+    isAdmin,
+    signOut,
+  }
 }

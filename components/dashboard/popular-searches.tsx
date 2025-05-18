@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchData } from "@/lib/api-client"
+import { formatDate } from "@/lib/utils" // Assuming formatDate is a utility function
 
 interface PopularSearchesProps {
   limit?: number
@@ -10,15 +11,15 @@ interface PopularSearchesProps {
 
 // Mock data for development and fallback
 const MOCK_SEARCHES = [
-  { query: "blueprints", count: 120 },
-  { query: "materials", count: 95 },
-  { query: "animation", count: 87 },
-  { query: "lighting", count: 76 },
-  { query: "physics", count: 65 },
+  { id: 1, term: "blueprints", count: 120, last_searched: new Date() },
+  { id: 2, term: "materials", count: 95, last_searched: new Date() },
+  { id: 3, term: "animation", count: 87, last_searched: new Date() },
+  { id: 4, term: "lighting", count: 76, last_searched: new Date() },
+  { id: 5, term: "physics", count: 65, last_searched: new Date() },
 ]
 
 export function PopularSearches({ limit = 5 }: PopularSearchesProps) {
-  const [searches, setSearches] = useState<{ query: string; count: number }[]>([])
+  const [searches, setSearches] = useState<{ id: number; term: string; count: number; last_searched: Date }[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isMockData, setIsMockData] = useState(false)
@@ -72,6 +73,7 @@ export function PopularSearches({ limit = 5 }: PopularSearchesProps) {
           <div key={i} className="flex justify-between items-center">
             <Skeleton className="h-4 w-[180px]" />
             <Skeleton className="h-4 w-[50px]" />
+            <Skeleton className="h-4 w-[100px]" />
           </div>
         ))
       ) : error && !isMockData ? (
@@ -81,12 +83,18 @@ export function PopularSearches({ limit = 5 }: PopularSearchesProps) {
       ) : (
         <div className="space-y-2">
           {isMockData && error && <div className="text-xs text-amber-600 mb-2">Showing mock data. Error: {error}</div>}
-          {searches.map((item, index) => (
-            <div key={index} className="flex justify-between items-center">
-              <span className="text-sm truncate max-w-[70%]">{item.query}</span>
-              <span className="text-sm font-medium bg-muted px-2 py-1 rounded-full">{item.count}</span>
-            </div>
-          ))}
+          <ul>
+            {Array.isArray(searches) &&
+              searches.map((search) => (
+                <li key={search.id} className="flex justify-between items-center">
+                  <span className="text-sm truncate max-w-[30%]">{search.term}</span>
+                  <span className="text-sm font-medium bg-muted px-2 py-1 rounded-full">{search.count}</span>
+                  <span className="text-sm font-medium bg-muted px-2 py-1 rounded-full">
+                    {formatDate(search.last_searched, "N/A")}
+                  </span>
+                </li>
+              ))}
+          </ul>
         </div>
       )}
     </div>

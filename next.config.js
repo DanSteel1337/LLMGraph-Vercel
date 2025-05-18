@@ -11,10 +11,8 @@ const nextConfig = {
     // Updated for Next.js 15 compatibility
     serverActions: true,
   },
-  // Completely disable static generation
+  // Use server output for serverless functions
   output: "server",
-  // Disable App Router completely
-  useFileSystemPublicRoutes: false,
   webpack: (config, { isServer }) => {
     // Handle Node.js modules properly
     if (!isServer) {
@@ -61,9 +59,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Disable App Router not-found handling
-  skipTrailingSlashRedirect: true,
-  skipMiddlewareUrlNormalize: true,
 }
 
 module.exports = nextConfig

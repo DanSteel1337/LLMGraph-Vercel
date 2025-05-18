@@ -3,7 +3,7 @@ import "./globals.css"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import { NavigationProvider } from "@/contexts/navigation-context"
-import { AuthProvider } from "@/lib/auth-simple"
+import { SupabaseProvider } from "@/lib/supabase/provider" // ✅ Correct import
 import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -26,10 +26,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <AuthProvider>
+        <SupabaseProvider>
           <NavigationProvider>{children}</NavigationProvider>
           <Toaster />
-        </AuthProvider>
+        </SupabaseProvider>
       </body>
     </html>
   )
