@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
-import { apiClient } from "@/lib/api-client"
+import apiClient from "@/lib/api-client"
 
 interface TrendData {
   date: string
@@ -53,10 +53,11 @@ export function SearchTrends() {
         }
 
         // Fetch real data from API
-        const trendsData = await apiClient.getSearchTrends()
+        const response = await apiClient.analytics.getSearchTrends()
 
-        if (Array.isArray(trendsData.data)) {
-          setData(trendsData.data)
+        if (Array.isArray(response.data)) {
+          setData(response.data)
+          setIsMockData(!!response.metadata?.isMockData)
         } else {
           throw new Error("Invalid data format received")
         }
@@ -73,7 +74,7 @@ export function SearchTrends() {
     }
 
     fetchSearchTrends()
-  }, [])
+  }, [activeTab])
 
   const getFilteredData = () => {
     if (activeTab === "week") {

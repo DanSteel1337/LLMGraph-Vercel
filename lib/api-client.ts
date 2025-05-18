@@ -233,7 +233,7 @@ export const settingsApi = {
 // Analytics API
 export const analyticsApi = {
   getCategoryDistribution: () => apiFetch<any[]>("/analytics/category-distribution"),
-  getSearchTrends: () => apiFetch<any[]>("/search?type=trends"),
+  getSearchTrends: () => apiFetch<any[]>("/analytics/search-trends"),
   getPopularSearches: () => apiFetch<any[]>("/search?type=popular"),
 }
 
