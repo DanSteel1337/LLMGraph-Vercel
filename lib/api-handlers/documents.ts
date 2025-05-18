@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase/server"
 import { v4 as uuidv4 } from "uuid"
+import { shouldUseMockData } from "@/lib/environment"
+import { MOCK_DOCUMENTS } from "@/lib/mock-data"
 
 // Type definitions
 export type Document = {
@@ -19,19 +21,51 @@ export type DocumentInput = Omit<Document, "id" | "created_at" | "updated_at">
 // Get all documents
 export async function getDocuments() {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      return {
+        data: MOCK_DOCUMENTS,
+        isMockData: true,
+      }
+    }
+
     const supabase = await createServerClient()
     const { data, error } = await supabase.from("documents").select("*").order("created_at", { ascending: false })
 
     return { data, error }
   } catch (error) {
     console.error("Error in getDocuments:", error)
-    return { data: null, error: error instanceof Error ? error : new Error("Unknown error in getDocuments") }
+    return {
+      data: MOCK_DOCUMENTS,
+      error: error instanceof Error ? error : new Error("Unknown error in getDocuments"),
+      isMockData: true,
+    }
   }
 }
 
 // Get a document by ID
 export async function getDocumentById(id: string) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      const mockDocument = MOCK_DOCUMENTS.find((doc) => doc.id === id) || {
+        id,
+        title: "Mock Document",
+        description: "This is a mock document for testing purposes",
+        category: "Testing",
+        version: "1.0",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        status: "published",
+        pageCount: 1,
+      }
+
+      return {
+        data: mockDocument,
+        isMockData: true,
+      }
+    }
+
     const supabase = await createServerClient()
     const { data, error } = await supabase.from("documents").select("*").eq("id", id).single()
 
@@ -48,6 +82,21 @@ export async function getDocumentById(id: string) {
 // Create a new document
 export async function createDocument(document: DocumentInput) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      const mockDocument = {
+        ...document,
+        id: uuidv4(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      return {
+        data: mockDocument,
+        isMockData: true,
+      }
+    }
+
     const supabase = await createServerClient()
     const { data, error } = await supabase
       .from("documents")
@@ -65,6 +114,20 @@ export async function createDocument(document: DocumentInput) {
 // Update a document
 export async function updateDocument(id: string, updates: Partial<DocumentInput>) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      const mockDocument = {
+        id,
+        ...updates,
+        updated_at: new Date().toISOString(),
+      }
+
+      return {
+        data: mockDocument,
+        isMockData: true,
+      }
+    }
+
     const supabase = await createServerClient()
     const { data, error } = await supabase.from("documents").update(updates).eq("id", id).select().single()
 
@@ -81,6 +144,14 @@ export async function updateDocument(id: string, updates: Partial<DocumentInput>
 // Delete a document
 export async function deleteDocument(id: string) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      return {
+        success: true,
+        isMockData: true,
+      }
+    }
+
     const supabase = await createServerClient()
 
     // First, delete related chunks
@@ -106,6 +177,21 @@ export async function deleteDocument(id: string) {
 // Get document chunks
 export async function getDocumentChunks(documentId: string) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      return {
+        data: [
+          {
+            id: "chunk-1",
+            document_id: documentId,
+            chunk_index: 0,
+            content: "This is a mock document chunk for testing purposes.",
+          },
+        ],
+        isMockData: true,
+      }
+    }
+
     const supabase = await createServerClient()
     const { data, error } = await supabase
       .from("document_chunks")
@@ -127,6 +213,20 @@ export async function getDocumentChunks(documentId: string) {
 // Get document vectors
 export async function getDocumentVectors(documentId: string) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      return {
+        data: [
+          {
+            id: "vector-1",
+            document_id: documentId,
+            vector: Array(10).fill(0.1),
+          },
+        ],
+        isMockData: true,
+      }
+    }
+
     const supabase = await createServerClient()
     const { data, error } = await supabase.from("document_vectors").select("*").eq("document_id", documentId)
 
@@ -144,6 +244,23 @@ export async function getDocumentVectors(documentId: string) {
 // Process document handler for multipart form data
 export async function processDocumentHandler(req: NextRequest) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      return NextResponse.json(
+        {
+          document: {
+            id: "mock-doc-" + Date.now(),
+            title: "Uploaded Document",
+            status: "processed",
+            created_at: new Date().toISOString(),
+          },
+          message: "Document uploaded and ready for processing (mock)",
+          isMockData: true,
+        },
+        { status: 201 },
+      )
+    }
+
     const formData = await req.formData()
     const file = formData.get("file") as File | null
     const title = formData.get("title") as string | null
@@ -219,6 +336,15 @@ The document will be processed when viewed.`
 // Process document content into chunks and vectors
 export async function processDocument(documentId: string, content: string) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      return {
+        success: true,
+        chunksProcessed: 5,
+        isMockData: true,
+      }
+    }
+
     const supabase = await createServerClient()
 
     // Split content into chunks (simple implementation - in production use a more sophisticated chunking strategy)

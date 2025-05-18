@@ -13,11 +13,26 @@ export function EnvVarChecker() {
     setChecking(true)
     try {
       const response = await fetch("/api/test-db-connection")
-      const data = await response.json()
-      setResults(data)
+
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get("content-type")
+      if (contentType && contentType.includes("application/json")) {
+        const data = await response.json()
+        setResults(data)
+      } else {
+        // Handle non-JSON responses
+        const text = await response.text()
+        setResults({
+          success: false,
+          error: `Invalid response format: ${text.substring(0, 100)}${text.length > 100 ? "..." : ""}`,
+        })
+      }
     } catch (error) {
       console.error("Error checking environment variables:", error)
-      setResults({ error: String(error) })
+      setResults({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
     } finally {
       setChecking(false)
     }

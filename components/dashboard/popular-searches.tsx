@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
-import { fetchData } from "@/lib/api-client"
-import { formatDate } from "@/lib/utils" // Assuming formatDate is a utility function
+import { apiClient } from "@/lib/api-client"
+import { formatDate } from "@/lib/utils"
+import { shouldUseMockData } from "@/lib/environment"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 interface PopularSearchesProps {
   limit?: number
@@ -31,13 +34,8 @@ export function PopularSearches({ limit = 5 }: PopularSearchesProps) {
         setError(null)
         setIsMockData(false)
 
-        // Check if we're on the login page
-        const isLoginPage =
-          typeof window !== "undefined" &&
-          (window.location.pathname === "/login" || window.location.pathname === "/signup")
-
-        // Use mock data if on login page or if env var is set
-        if (isLoginPage || process.env.USE_MOCK_DATA === "true") {
+        // Check if we should use mock data
+        if (shouldUseMockData()) {
           // Simulate network delay
           await new Promise((resolve) => setTimeout(resolve, 500))
           setSearches(MOCK_SEARCHES.slice(0, limit))
@@ -45,12 +43,19 @@ export function PopularSearches({ limit = 5 }: PopularSearchesProps) {
           return
         }
 
-        // Use Supabase client directly instead of deprecated function
-        const data = await fetchData<any[]>("/api/search?type=popular", {
-          requiresAuth: true,
-        })
+        // Fetch popular searches using apiClient
+        const response = await apiClient.get<any[]>("/api/search?type=popular")
 
-        setSearches(data.slice(0, limit))
+        if (response.error) {
+          throw new Error(response.error)
+        }
+
+        // Check if the response contains mock data
+        if (response.isMockData) {
+          setIsMockData(true)
+        }
+
+        setSearches(response.data.slice(0, limit))
       } catch (error) {
         console.error("Error fetching popular searches:", error)
         setError("Failed to fetch popular searches")
@@ -82,7 +87,14 @@ export function PopularSearches({ limit = 5 }: PopularSearchesProps) {
         <div className="text-center py-4 text-sm text-muted-foreground">No search data available</div>
       ) : (
         <div className="space-y-2">
-          {isMockData && error && <div className="text-xs text-amber-600 mb-2">Showing mock data. Error: {error}</div>}
+          {isMockData && (
+            <Alert variant="warning" className="mb-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                Showing mock data. Connect to a database in production.
+              </AlertDescription>
+            </Alert>
+          )}
           <ul>
             {Array.isArray(searches) &&
               searches.map((search) => (

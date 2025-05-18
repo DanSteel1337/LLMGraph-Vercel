@@ -1,64 +1,87 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSupabase } from "@/lib/supabase/provider"
-import { useRouter } from "next/navigation"
-import { logError } from "@/lib/error-handler"
+import { apiClient } from "@/lib/api-client"
+import { shouldUseMockData } from "@/lib/environment"
 
-export function useAuthState() {
-  const { supabase, user, loading } = useSupabase()
+interface User {
+  id: string
+  email: string
+  name?: string
+  role?: string
+}
+
+interface Session {
+  user: User
+  expires_at?: number
+}
+
+interface AuthState {
+  session: Session | null
+  isLoading: boolean
+  isAdmin: boolean
+  error: Error | null
+}
+
+// Mock data for development
+const MOCK_SESSION: Session = {
+  user: {
+    id: "mock-user-id",
+    email: "mock-user@example.com",
+    name: "Mock User",
+    role: "admin",
+  },
+  expires_at: Date.now() + 86400000, // 24 hours from now
+}
+
+export function useAuthState(): AuthState {
+  const [session, setSession] = useState<Session | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
-  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true)
-  const router = useRouter()
+  const [error, setError] = useState<Error | null>(null)
 
-  // Check if user is admin
   useEffect(() => {
-    async function checkAdminStatus() {
-      if (!user) {
-        setIsAdmin(false)
-        setIsCheckingAdmin(false)
-        return
-      }
-
+    async function fetchSession() {
       try {
-        const { data, error } = await supabase.from("admins").select("*").eq("user_id", user.id).single()
+        setIsLoading(true)
 
-        if (error) {
-          throw error
+        // Check if we should use mock data
+        if (shouldUseMockData()) {
+          setSession(MOCK_SESSION)
+          setIsAdmin(true)
+          return
         }
 
-        setIsAdmin(!!data)
-      } catch (error) {
-        logError(error, "admin_check_error")
-        setIsAdmin(false)
+        // Fetch session from API
+        const response = await apiClient.get("/auth?type=session")
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch session")
+        }
+
+        const data = await response.json()
+
+        if (data.session) {
+          setSession(data.session)
+
+          // Check if user is admin
+          const adminResponse = await apiClient.get("/auth?type=admin")
+
+          if (adminResponse.ok) {
+            const adminData = await adminResponse.json()
+            setIsAdmin(adminData.isAdmin)
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching auth state:", err)
+        setError(err instanceof Error ? err : new Error("Unknown error"))
       } finally {
-        setIsCheckingAdmin(false)
+        setIsLoading(false)
       }
     }
 
-    if (user) {
-      checkAdminStatus()
-    } else if (!loading) {
-      setIsAdmin(false)
-      setIsCheckingAdmin(false)
-    }
-  }, [user, loading, supabase])
+    fetchSession()
+  }, [])
 
-  // Sign out function
-  const signOut = async () => {
-    try {
-      await supabase.auth.signOut()
-      router.push("/login")
-    } catch (error) {
-      logError(error, "sign_out_error")
-      console.error("Error signing out:", error)
-    }
-  }
-
-  return {
-    user,
-    loading: loading || isCheckingAdmin,
-    isAdmin,
-    signOut,
-  }
+  return { session, isLoading, isAdmin, error }
 }

@@ -1,4 +1,14 @@
 /**
+ * General Utilities Module
+ *
+ * Provides common utility functions for string manipulation, formatting,
+ * data validation, and other general-purpose operations used throughout
+ * the application.
+ *
+ * @module utils
+ */
+
+/**
  * Combines class names using clsx and tailwind-merge
  */
 export function cn(...classes: (string | undefined | null | false)[]): string {

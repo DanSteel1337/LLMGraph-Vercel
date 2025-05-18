@@ -4,9 +4,11 @@ import { useState } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ThumbsUp, ThumbsDown, ExternalLink, ChevronDown, ChevronUp } from "lucide-react"
+import { ThumbsUp, ThumbsDown, ExternalLink, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { feedbackApi } from "@/lib/api-client"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import apiClient from "@/lib/api-client"
+import { shouldUseMockData } from "@/lib/environment"
 
 interface SearchResult {
   id: string
@@ -27,11 +29,15 @@ interface SearchResultsProps {
   results: SearchResult[]
   query: string
   onFeedback: (resultId: string, isPositive: boolean) => void
+  isMockData?: boolean
 }
 
-export default function SearchResults({ results, query, onFeedback }: SearchResultsProps) {
+export default function SearchResults({ results, query, onFeedback, isMockData }: SearchResultsProps) {
   const [expandedResults, setExpandedResults] = useState<Record<string, boolean>>({})
   const [feedbackGiven, setFeedbackGiven] = useState<Record<string, boolean>>({})
+
+  // Determine if we're using mock data
+  const usingMockData = isMockData || shouldUseMockData()
 
   const toggleExpand = (id: string) => {
     setExpandedResults((prev) => ({
@@ -43,7 +49,7 @@ export default function SearchResults({ results, query, onFeedback }: SearchResu
   const handleFeedback = async (id: string, isPositive: boolean) => {
     if (!feedbackGiven[id]) {
       try {
-        await feedbackApi.create({
+        await apiClient.feedback.create({
           resultId: id,
           query,
           isPositive,
@@ -125,6 +131,13 @@ export default function SearchResults({ results, query, onFeedback }: SearchResu
 
   return (
     <div className="space-y-4">
+      {usingMockData && (
+        <Alert variant="warning" className="mb-4">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>Using mock search results for demonstration purposes.</AlertDescription>
+        </Alert>
+      )}
+
       {Array.isArray(results) &&
         results.map((result) => (
           <Card key={result.id} className="overflow-hidden">
@@ -191,7 +204,7 @@ export default function SearchResults({ results, query, onFeedback }: SearchResu
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => handleFeedback(result.id, true)}
-                  disabled={feedbackGiven[result.id]}
+                  disabled={feedbackGiven[result.id] || usingMockData}
                   title="This was helpful"
                 >
                   <ThumbsUp className="h-4 w-4" />
@@ -201,7 +214,7 @@ export default function SearchResults({ results, query, onFeedback }: SearchResu
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => handleFeedback(result.id, false)}
-                  disabled={feedbackGiven[result.id]}
+                  disabled={feedbackGiven[result.id] || usingMockData}
                   title="This was not helpful"
                 >
                   <ThumbsDown className="h-4 w-4" />

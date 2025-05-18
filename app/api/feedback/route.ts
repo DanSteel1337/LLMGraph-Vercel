@@ -7,8 +7,10 @@ import {
   deleteFeedback,
   getFeedbackStats,
 } from "@/lib/api-handlers/feedback"
+import { shouldUseMockData } from "@/lib/environment"
+import { MOCK_FEEDBACK } from "@/lib/mock-data"
 
-export const runtime = "nodejs" // Use Node.js runtime for Supabase
+export const runtime = "edge"
 
 // Main feedback endpoint
 export async function GET(req: NextRequest) {
@@ -16,6 +18,42 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const id = searchParams.get("id")
     const type = searchParams.get("type") || "all"
+
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      // Return mock data based on the request type
+      switch (type) {
+        case "stats":
+          return NextResponse.json({
+            totalFeedback: MOCK_FEEDBACK.length,
+            positiveRate: 67,
+            averageRating: 4.2,
+            isMockData: true,
+          })
+
+        case "single":
+          if (!id) {
+            return NextResponse.json({ error: "Feedback ID is required" }, { status: 400 })
+          }
+
+          const mockFeedback = MOCK_FEEDBACK.find((f) => f.id === id)
+          if (!mockFeedback) {
+            return NextResponse.json({ error: "Feedback not found" }, { status: 404 })
+          }
+
+          return NextResponse.json({
+            feedback: mockFeedback,
+            isMockData: true,
+          })
+
+        case "all":
+        default:
+          return NextResponse.json({
+            feedback: MOCK_FEEDBACK,
+            isMockData: true,
+          })
+      }
+    }
 
     // Handle different feedback-related requests
     switch (type) {
@@ -53,7 +91,14 @@ export async function GET(req: NextRequest) {
     }
   } catch (error) {
     console.error("Error in GET /api/feedback:", error)
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+        feedback: MOCK_FEEDBACK,
+        isMockData: true,
+      },
+      { status: 500 },
+    )
   }
 }
 
@@ -65,6 +110,24 @@ export async function POST(req: NextRequest) {
 
     if (!rating) {
       return NextResponse.json({ error: "Rating is required" }, { status: 400 })
+    }
+
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      return NextResponse.json(
+        {
+          feedback: {
+            id: `feedback-${Date.now()}`,
+            rating,
+            comment: comment || "",
+            source: source || "unknown",
+            user_id: userId || null,
+            created_at: new Date().toISOString(),
+          },
+          isMockData: true,
+        },
+        { status: 201 },
+      )
     }
 
     const { data, error } = await submitFeedback({
@@ -96,6 +159,19 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Feedback ID is required" }, { status: 400 })
     }
 
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      const body = await req.json()
+      return NextResponse.json({
+        feedback: {
+          id,
+          ...body,
+          updated_at: new Date().toISOString(),
+        },
+        isMockData: true,
+      })
+    }
+
     const body = await req.json()
     const { data, error } = await updateFeedback(id, body)
 
@@ -118,6 +194,14 @@ export async function DELETE(req: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: "Feedback ID is required" }, { status: 400 })
+    }
+
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      return NextResponse.json({
+        success: true,
+        isMockData: true,
+      })
     }
 
     const { error, success } = await deleteFeedback(id)

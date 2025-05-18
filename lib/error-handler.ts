@@ -1,4 +1,13 @@
 /**
+ * Error Handling Module
+ *
+ * Provides utilities for consistent error handling, logging, and formatting
+ * across the application. Includes error severity levels and context tracking.
+ *
+ * @module error-handler
+ */
+
+/**
  * Error severity levels
  */
 export enum ErrorSeverity {
@@ -103,6 +112,11 @@ export function handleApiError(error: unknown, errorCode = "api_error") {
   return createErrorResponse(error, statusCode)
 }
 
+/**
+ * Checks if an error is a network-related error
+ * @param error The error to check
+ * @returns True if the error is network-related, false otherwise
+ */
 export function isNetworkError(error: unknown): boolean {
   return error instanceof Error && (error.message.includes("network") || error.message.includes("fetch"))
 }

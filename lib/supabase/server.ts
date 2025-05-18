@@ -1,136 +1,101 @@
+/**
+ * Supabase Server Client Module
+ *
+ * Provides a Supabase client for server environments.
+ * Handles cookie-based authentication and provides
+ * mock implementations for development environments.
+ *
+ * @module supabase/server
+ */
+
 import { createServerClient as createSupabaseServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import { isBrowser } from "@/lib/utils"
-import { validateEnvVar } from "@/lib/env-validator"
-import { logError } from "@/lib/error-handler"
-
-// Error message for server-side usage in browser context
-const SERVER_ONLY_ERROR = "Supabase server client cannot be used in browser context"
-
-// Track if we've already logged the "no session" message
-let hasLoggedNoSession = false
+import type { Database } from "@/types/supabase"
+import { shouldUseMockData } from "../environment"
 
 /**
- * Creates a Supabase client for server-side usage
- * This should only be used in server components, API routes, or server actions
+ * Create a mock Supabase server client for development
+ * @returns Mock Supabase server client
  */
-export function createClient() {
-  try {
-    if (isBrowser()) {
-      console.error(SERVER_ONLY_ERROR)
-      throw new Error(SERVER_ONLY_ERROR)
-    }
+function createMockSupabaseServerClient() {
+  return {
+    auth: {
+      getSession: async () => ({
+        data: { session: { user: { id: "mock-user-id", email: "mock@example.com" } } },
+        error: null,
+      }),
+      getUser: async () => ({ data: { user: { id: "mock-user-id", email: "mock@example.com" } }, error: null }),
+    },
+    from: (table: string) => ({
+      select: () => ({
+        eq: () => ({
+          single: async () => ({ data: { id: "mock-id" }, error: null }),
+          data: [{ id: "mock-id" }],
+          error: null,
+        }),
+        order: () => ({
+          limit: () => ({
+            data: [{ id: "mock-id" }],
+            error: null,
+          }),
+        }),
+        data: [{ id: "mock-id" }],
+        error: null,
+      }),
+      insert: () => ({
+        select: () => ({
+          data: { id: "mock-id" },
+          error: null,
+        }),
+      }),
+      update: () => ({
+        eq: () => ({
+          data: { id: "mock-id" },
+          error: null,
+        }),
+      }),
+      delete: () => ({
+        eq: () => ({
+          data: null,
+          error: null,
+        }),
+      }),
+    }),
+  } as any
+}
 
-    const cookieStore = cookies()
-    const supabaseUrl = validateEnvVar("NEXT_PUBLIC_SUPABASE_URL")
-    const supabaseServiceKey = validateEnvVar("SUPABASE_SERVICE_ROLE_KEY")
+/**
+ * Create a Supabase client for server environments
+ * @returns Supabase server client
+ */
+export function createServerClient() {
+  // Check if we should use mock data
+  if (shouldUseMockData()) {
+    console.log("[MOCK] Using mock Supabase server client")
+    return createMockSupabaseServerClient()
+  }
 
-    return createSupabaseServerClient(supabaseUrl, supabaseServiceKey, {
+  const cookieStore = cookies()
+
+  return createSupabaseServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
       cookies: {
-        get(name) {
-          return cookieStore.get(name)?.value
+        get: (name) => cookieStore.get(name)?.value,
+        set: (name, value, options) => {
+          cookieStore.set(name, value, options)
         },
-        set(name, value, options) {
-          cookieStore.set({ name, value, ...options })
-        },
-        remove(name, options) {
-          cookieStore.set({ name, value: "", ...options })
+        remove: (name, options) => {
+          cookieStore.set(name, "", { ...options, maxAge: 0 })
         },
       },
-      auth: {
-        onAuthStateChange: (event, session) => {
-          if (!session && !hasLoggedNoSession && process.env.NODE_ENV === "production") {
-            console.log("[SERVER] No active session found")
-            hasLoggedNoSession = true
-          }
-        },
-      },
-    })
-  } catch (error) {
-    if (error instanceof Error && error.message === SERVER_ONLY_ERROR) {
-      throw error // Re-throw browser context error
-    }
-
-    logError(error, "supabase_server_client_creation_error")
-    throw new Error(
-      `Failed to create Supabase server client: ${error instanceof Error ? error.message : "Unknown error"}`,
-    )
-  }
+    },
+  )
 }
 
 /**
- * Creates a Supabase admin client with service role permissions
- * This should only be used in server contexts where admin privileges are required
+ * Alias for createServerClient for compatibility
+ * @returns Supabase server client
  */
-export function createAdminClient() {
-  try {
-    if (isBrowser()) {
-      console.error(SERVER_ONLY_ERROR)
-      throw new Error(SERVER_ONLY_ERROR)
-    }
-
-    const supabaseUrl = validateEnvVar("NEXT_PUBLIC_SUPABASE_URL")
-    const supabaseServiceKey = validateEnvVar("SUPABASE_SERVICE_ROLE_KEY")
-
-    return createSupabaseServerClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-  } catch (error) {
-    if (error instanceof Error && error.message === SERVER_ONLY_ERROR) {
-      throw error // Re-throw browser context error
-    }
-
-    logError(error, "supabase_admin_client_creation_error")
-    throw new Error(
-      `Failed to create Supabase admin client: ${error instanceof Error ? error.message : "Unknown error"}`,
-    )
-  }
-}
-
-/**
- * Retrieves a Supabase server client using cookies
- * This should be used in server contexts where Supabase client is needed
- */
-export function getSupabaseServerClient() {
-  try {
-    if (isBrowser()) {
-      console.error(SERVER_ONLY_ERROR)
-      throw new Error(SERVER_ONLY_ERROR)
-    }
-
-    const cookieStore = cookies()
-    const supabaseUrl = validateEnvVar("NEXT_PUBLIC_SUPABASE_URL")
-    const supabaseServiceKey = validateEnvVar("SUPABASE_SERVICE_ROLE_KEY")
-
-    return createSupabaseServerClient(supabaseUrl, supabaseServiceKey, {
-      cookies: {
-        get(name) {
-          return cookieStore.get(name)?.value
-        },
-        set(name, value, options) {
-          cookieStore.set({ name, value, ...options })
-        },
-        remove(name, options) {
-          cookieStore.set({ name, value: "", ...options })
-        },
-      },
-    })
-  } catch (error) {
-    if (error instanceof Error && error.message === SERVER_ONLY_ERROR) {
-      throw error // Re-throw browser context error
-    }
-
-    logError(error, "supabase_server_client_creation_error")
-    throw new Error(
-      `Failed to create Supabase server client: ${error instanceof Error ? error.message : "Unknown error"}`,
-    )
-  }
-}
-
-/**
- * Export createServerClient for compatibility
- */
-export const createServerClient = createSupabaseServerClient
+export const createClient = createServerClient

@@ -3,7 +3,7 @@ import "./globals.css"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import { NavigationProvider } from "@/contexts/navigation-context"
-import { SupabaseProvider } from "@/lib/supabase/provider" // ✅ Correct import
+import { SupabaseProvider } from "@/lib/supabase/provider"
 import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })

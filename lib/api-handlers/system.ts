@@ -1,83 +1,107 @@
-import { createClient } from "@/lib/supabase/server"
-import { createClient as createPineconeClient } from "@/lib/pinecone/client"
-import { validateEnvVar } from "@/lib/env-validator"
-import { logError } from "@/lib/error-handler"
+import { createServerClient } from "@/lib/supabase/server"
+import { checkPineconeConnection as checkPineconeConnectionUtil } from "@/lib/pinecone/client"
+import { shouldUseMockData } from "@/lib/environment"
+import { MOCK_STATS } from "@/lib/mock-data"
 
-// Type for system stats response
-interface SystemStats {
-  totalDocuments: number
-  totalSearches: number
-  totalUsers: number
-  uptime: string
-  cpuUsage: string
-  memoryUsage: string
-  lastUpdated: string
-}
+// Check database connection
+export async function checkDatabaseConnection() {
+  try {
+    // Use mock data in development or preview
+    if (shouldUseMockData()) {
+      console.log("[MOCK] Using mock database connection status")
+      return {
+        connected: true,
+        message: "Connected (Mock)",
+        isMockData: true,
+      }
+    }
 
-// Type for health status response
-interface HealthStatus {
-  status: "healthy" | "degraded" | "unhealthy"
-  services: {
-    database: {
-      status: "up" | "down" | "degraded"
-      latency: number
+    const supabase = createServerClient()
+    const { data, error } = await supabase.from("documents").select("id").limit(1)
+
+    if (error) {
+      console.error("Database connection error:", error)
+      return {
+        connected: false,
+        message: error.message,
+        error,
+      }
     }
-    search: {
-      status: "up" | "down" | "degraded"
-      latency: number
+
+    return {
+      connected: true,
+      message: "Connected successfully",
     }
-    storage: {
-      status: "up" | "down" | "degraded"
-      latency: number
+  } catch (error) {
+    console.error("Error checking database connection:", error)
+    return {
+      connected: false,
+      message: error instanceof Error ? error.message : "Unknown error",
+      error,
     }
   }
-  message?: string
 }
 
-// Type for database connection check response
-interface DatabaseConnectionStatus {
-  connected: boolean
-  latency: number
-  message: string
-  timestamp: string
-}
-
-// Type for Pinecone connection check response
-interface PineconeConnectionStatus {
-  connected: boolean
-  latency: number
-  message: string
-  timestamp: string
-  indexes?: string[]
-}
-
-// Type for API response
-interface ApiResponse<T> {
-  data: T
-  error?: Error
-}
-
-/**
- * Get system statistics
- * @returns System statistics
- */
-export async function getSystemStats(): Promise<ApiResponse<SystemStats>> {
+// Check Pinecone connection
+export async function checkPineconeConnection() {
   try {
-    // Validate environment variables
-    validateEnvVar("NEXT_PUBLIC_SUPABASE_URL")
-    validateEnvVar("SUPABASE_SERVICE_ROLE_KEY")
+    // Use mock data in development or preview
+    if (shouldUseMockData()) {
+      console.log("[MOCK] Using mock Pinecone connection status")
+      return {
+        connected: true,
+        message: "Connected (Mock)",
+        isMockData: true,
+      }
+    }
 
-    const supabase = createClient()
-    const startTime = Date.now()
+    const result = await checkPineconeConnectionUtil()
+
+    return {
+      connected: result.success,
+      message: result.message,
+      stats: result.stats,
+    }
+  } catch (error) {
+    console.error("Error checking Pinecone connection:", error)
+    return {
+      connected: false,
+      message: error instanceof Error ? error.message : "Unknown error",
+      error,
+    }
+  }
+}
+
+// Get system stats
+export async function getSystemStats() {
+  try {
+    // Use mock data in development or preview
+    if (shouldUseMockData()) {
+      console.log("[MOCK] Using mock system stats")
+      return {
+        data: {
+          ...MOCK_STATS,
+          isMockData: true,
+          services: {
+            database: { status: "ok", message: "Connected (Mock)" },
+            pinecone: { status: "ok", message: "Operational (Mock)" },
+          },
+        },
+      }
+    }
+
+    const supabase = createServerClient()
 
     // Get document count
-    const { count: documentCount, error: documentError } = await supabase
+    const { count: documentCount, error: docError } = await supabase
       .from("documents")
       .select("*", { count: "exact", head: true })
 
-    if (documentError) {
-      logError(documentError, "system_stats_document_count_error")
-      throw new Error(`Failed to get document count: ${documentError.message}`)
+    if (docError) {
+      console.error("Error fetching document count:", docError)
+      return {
+        error: docError,
+      }
     }
 
     // Get search count
@@ -86,8 +110,22 @@ export async function getSystemStats(): Promise<ApiResponse<SystemStats>> {
       .select("*", { count: "exact", head: true })
 
     if (searchError) {
-      logError(searchError, "system_stats_search_count_error")
-      throw new Error(`Failed to get search count: ${searchError.message}`)
+      console.error("Error fetching search count:", searchError)
+      return {
+        error: searchError,
+      }
+    }
+
+    // Get feedback count
+    const { count: feedbackCount, error: feedbackError } = await supabase
+      .from("feedback")
+      .select("*", { count: "exact", head: true })
+
+    if (feedbackError) {
+      console.error("Error fetching feedback count:", feedbackError)
+      return {
+        error: feedbackError,
+      }
     }
 
     // Get user count
@@ -96,202 +134,117 @@ export async function getSystemStats(): Promise<ApiResponse<SystemStats>> {
       .select("*", { count: "exact", head: true })
 
     if (userError) {
-      logError(userError, "system_stats_user_count_error")
-      throw new Error(`Failed to get user count: ${userError.message}`)
-    }
-
-    // Calculate mock system metrics
-    const uptime = "5d 12h 30m" // Mock uptime
-    const cpuUsage = "32%" // Mock CPU usage
-    const memoryUsage = "45%" // Mock memory usage
-
-    return {
-      data: {
-        totalDocuments: documentCount || 0,
-        totalSearches: searchCount || 0,
-        totalUsers: userCount || 0,
-        uptime,
-        cpuUsage,
-        memoryUsage,
-        lastUpdated: new Date().toISOString(),
-      },
-    }
-  } catch (error) {
-    logError(error, "system_stats_error")
-    return {
-      data: {
-        totalDocuments: 125, // Mock data
-        totalSearches: 1250,
-        totalUsers: 45,
-        uptime: "5d 12h 30m",
-        cpuUsage: "32%",
-        memoryUsage: "45%",
-        lastUpdated: new Date().toISOString(),
-      },
-      error: error instanceof Error ? error : new Error(String(error)),
-    }
-  }
-}
-
-/**
- * Check database connection
- * @returns Database connection status
- */
-export async function checkDatabaseConnection(): Promise<DatabaseConnectionStatus> {
-  try {
-    // Validate environment variables
-    validateEnvVar("NEXT_PUBLIC_SUPABASE_URL")
-    validateEnvVar("SUPABASE_SERVICE_ROLE_KEY")
-
-    const startTime = Date.now()
-    const supabase = createClient()
-
-    // Simple query to check connection
-    const { data, error } = await supabase.from("documents").select("count(*)", { count: "exact" }).limit(1)
-
-    const endTime = Date.now()
-    const latency = endTime - startTime
-
-    if (error) {
-      logError(error, "database_connection_check_error")
+      console.error("Error fetching user count:", userError)
       return {
-        connected: false,
-        latency,
-        message: `Database connection failed: ${error.message}`,
-        timestamp: new Date().toISOString(),
+        error: userError,
       }
     }
 
+    // Check Pinecone connection
+    const pineconeStatus = await checkPineconeConnection()
+
     return {
-      connected: true,
-      latency,
-      message: "Database connection successful",
-      timestamp: new Date().toISOString(),
+      data: {
+        documentCount: documentCount || 0,
+        searchCount: searchCount || 0,
+        feedbackCount: feedbackCount || 0,
+        userCount: userCount || 0,
+        pineconeStatus: pineconeStatus.connected ? "connected" : "disconnected",
+        services: {
+          database: { status: "ok", message: "Connected" },
+          pinecone: {
+            status: pineconeStatus.connected ? "ok" : "error",
+            message: pineconeStatus.message || (pineconeStatus.connected ? "Operational" : "Connection failed"),
+          },
+        },
+      },
     }
   } catch (error) {
-    logError(error, "database_connection_check_error")
+    console.error("Error getting system stats:", error)
     return {
-      connected: false,
-      latency: 0,
-      message: `Database connection failed: ${error instanceof Error ? error.message : String(error)}`,
-      timestamp: new Date().toISOString(),
+      error,
+      data: {
+        ...MOCK_STATS,
+        isMockData: true,
+        services: {
+          database: { status: "error", message: "Error fetching stats" },
+          pinecone: { status: "warning", message: "Status unknown" },
+        },
+      },
     }
   }
 }
 
-/**
- * Check Pinecone connection
- * @returns Pinecone connection status
- */
-export async function checkPineconeConnection(): Promise<PineconeConnectionStatus> {
+// Get system status
+export async function getSystemStatus() {
   try {
-    // Validate environment variables
-    validateEnvVar("PINECONE_API_KEY")
-    validateEnvVar("PINECONE_INDEX_NAME")
-
-    const startTime = Date.now()
-    const pinecone = createPineconeClient()
-
-    // Check if Pinecone client is available
-    if (!pinecone) {
+    // Use mock data in development or preview
+    if (shouldUseMockData()) {
+      console.log("[MOCK] Using mock system status")
       return {
-        connected: false,
-        latency: 0,
-        message: "Pinecone client not available",
-        timestamp: new Date().toISOString(),
+        status: "ok",
+        stats: {
+          ...MOCK_STATS,
+          isMockData: true,
+          services: {
+            database: { status: "ok", message: "Connected (Mock)" },
+            pinecone: { status: "ok", message: "Operational (Mock)" },
+          },
+        },
       }
     }
 
-    // List indexes to check connection
-    const indexes = await pinecone.listIndexes()
-
-    const endTime = Date.now()
-    const latency = endTime - startTime
-
-    return {
-      connected: true,
-      latency,
-      message: "Pinecone connection successful",
-      timestamp: new Date().toISOString(),
-      indexes: indexes.map((index) => index.name),
-    }
-  } catch (error) {
-    logError(error, "pinecone_connection_check_error")
-    return {
-      connected: false,
-      latency: 0,
-      message: `Pinecone connection failed: ${error instanceof Error ? error.message : String(error)}`,
-      timestamp: new Date().toISOString(),
-    }
-  }
-}
-
-/**
- * Get overall system health status
- * @returns Health status
- */
-export async function getHealthStatus(): Promise<ApiResponse<HealthStatus>> {
-  try {
     // Check database connection
     const dbStatus = await checkDatabaseConnection()
 
     // Check Pinecone connection
     const pineconeStatus = await checkPineconeConnection()
 
-    // Determine overall status
-    let overallStatus: "healthy" | "degraded" | "unhealthy" = "healthy"
-    let message = "All systems operational"
+    // Get system stats
+    const { data: stats, error: statsError } = await getSystemStats()
 
-    if (!dbStatus.connected && !pineconeStatus.connected) {
-      overallStatus = "unhealthy"
-      message = "Multiple critical services are down"
-    } else if (!dbStatus.connected || !pineconeStatus.connected) {
-      overallStatus = "degraded"
-      message = "Some services are experiencing issues"
-    }
-
-    return {
-      data: {
-        status: overallStatus,
-        services: {
-          database: {
-            status: dbStatus.connected ? "up" : "down",
-            latency: dbStatus.latency,
-          },
-          search: {
-            status: pineconeStatus.connected ? "up" : "down",
-            latency: pineconeStatus.latency,
-          },
-          storage: {
-            status: dbStatus.connected ? "up" : "down", // Using DB status as proxy for storage
-            latency: dbStatus.latency,
+    if (statsError) {
+      console.error("Error getting system stats:", statsError)
+      return {
+        status: "error",
+        error: statsError,
+        stats: {
+          ...MOCK_STATS,
+          isMockData: true,
+          services: {
+            database: { status: dbStatus.connected ? "ok" : "error", message: dbStatus.message },
+            pinecone: { status: pineconeStatus.connected ? "ok" : "error", message: pineconeStatus.message },
           },
         },
-        message,
+      }
+    }
+
+    // Determine overall status
+    const status = dbStatus.connected && pineconeStatus.connected ? "ok" : "error"
+
+    return {
+      status,
+      stats: {
+        ...stats,
+        services: {
+          database: { status: dbStatus.connected ? "ok" : "error", message: dbStatus.message },
+          pinecone: { status: pineconeStatus.connected ? "ok" : "error", message: pineconeStatus.message },
+        },
       },
     }
   } catch (error) {
-    logError(error, "health_status_check_error")
+    console.error("Error getting system status:", error)
     return {
-      data: {
-        status: "degraded",
+      status: "error",
+      error,
+      stats: {
+        ...MOCK_STATS,
+        isMockData: true,
         services: {
-          database: {
-            status: "degraded",
-            latency: 0,
-          },
-          search: {
-            status: "degraded",
-            latency: 0,
-          },
-          storage: {
-            status: "degraded",
-            latency: 0,
-          },
+          database: { status: "error", message: "Error checking database" },
+          pinecone: { status: "error", message: "Error checking Pinecone" },
         },
-        message: "Error checking health status",
       },
-      error: error instanceof Error ? error : new Error(String(error)),
     }
   }
 }

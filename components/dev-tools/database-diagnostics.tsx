@@ -5,6 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ErrorBoundary from "@/components/ui/error-boundary"
+import { apiClient } from "@/lib/api-client"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 export function DatabaseDiagnostics() {
   const [supabaseStatus, setSupabaseStatus] = useState<"checking" | "connected" | "error">("checking")
@@ -13,21 +16,28 @@ export function DatabaseDiagnostics() {
   const [pineconeError, setPineconeError] = useState<string | null>(null)
   const [supabaseDetails, setSupabaseDetails] = useState<any>(null)
   const [pineconeDetails, setPineconeDetails] = useState<any>(null)
+  const [supabaseMockData, setSupabaseMockData] = useState(false)
+  const [pineconeMockData, setPineconeMockData] = useState(false)
 
   const checkSupabase = async () => {
     setSupabaseStatus("checking")
     setSupabaseError(null)
+    setSupabaseMockData(false)
 
     try {
-      const response = await fetch("/api/diagnostics/supabase")
-      const data = await response.json()
+      const response = await apiClient.get("/api/diagnostics/supabase")
 
-      if (data.success) {
+      // Check if the response contains mock data
+      if (response.isMockData) {
+        setSupabaseMockData(true)
+      }
+
+      if (response.data.success) {
         setSupabaseStatus("connected")
-        setSupabaseDetails(data.details)
+        setSupabaseDetails(response.data.details)
       } else {
         setSupabaseStatus("error")
-        setSupabaseError(data.error)
+        setSupabaseError(response.data.error)
       }
     } catch (error) {
       setSupabaseStatus("error")
@@ -38,17 +48,22 @@ export function DatabaseDiagnostics() {
   const checkPinecone = async () => {
     setPineconeStatus("checking")
     setPineconeError(null)
+    setPineconeMockData(false)
 
     try {
-      const response = await fetch("/api/diagnostics/pinecone")
-      const data = await response.json()
+      const response = await apiClient.get("/api/diagnostics/pinecone")
 
-      if (data.success) {
+      // Check if the response contains mock data
+      if (response.isMockData) {
+        setPineconeMockData(true)
+      }
+
+      if (response.data.success) {
         setPineconeStatus("connected")
-        setPineconeDetails(data.details)
+        setPineconeDetails(response.data.details)
       } else {
         setPineconeStatus("error")
-        setPineconeError(data.error)
+        setPineconeError(response.data.error)
       }
     } catch (error) {
       setPineconeStatus("error")
@@ -77,6 +92,16 @@ export function DatabaseDiagnostics() {
 
             <TabsContent value="supabase">
               <div className="space-y-4">
+                {supabaseMockData && (
+                  <Alert variant="warning">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Preview Mode</AlertTitle>
+                    <AlertDescription>
+                      You are viewing mock diagnostic data. Connect to a real database in production.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <div
@@ -118,6 +143,16 @@ export function DatabaseDiagnostics() {
 
             <TabsContent value="pinecone">
               <div className="space-y-4">
+                {pineconeMockData && (
+                  <Alert variant="warning">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Preview Mode</AlertTitle>
+                    <AlertDescription>
+                      You are viewing mock diagnostic data. Connect to a real vector database in production.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <div

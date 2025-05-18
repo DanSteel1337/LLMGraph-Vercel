@@ -1,95 +1,54 @@
-import { NextResponse } from "next/server"
-import { performSearch, getPopularSearches, getSearchTrends } from "@/lib/api-handlers/search"
-import { MOCK_POPULAR_SEARCHES, MOCK_SEARCH_TRENDS, MOCK_SEARCH_RESULTS } from "@/lib/mock-data"
+import { type NextRequest, NextResponse } from "next/server"
+import { performSearch } from "@/lib/api-handlers/search"
+import { MOCK_SEARCH_RESULTS } from "@/lib/mock-data"
+import { shouldUseMockData } from "@/lib/environment"
 
-export const runtime = "nodejs" // Use Node.js runtime for Supabase
+export const runtime = "edge" // Use Edge runtime for better performance
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
+  const searchParams = req.nextUrl.searchParams
+  const query = searchParams.get("q") || ""
+  const type = searchParams.get("type") || "hybrid"
+
+  // Return mock data in preview environments
+  if (shouldUseMockData()) {
+    return NextResponse.json({
+      results: MOCK_SEARCH_RESULTS,
+      isMockData: true,
+      searchType: type,
+    })
+  }
+
   try {
-    const url = new URL(req.url)
-    const type = url.searchParams.get("type")
-
-    // Handle popular searches
-    if (type === "popular") {
-      const { data, error } = await getPopularSearches()
-
-      if (error) {
-        console.error("Error fetching popular searches:", error)
-        return NextResponse.json({
-          popularSearches: MOCK_POPULAR_SEARCHES,
-          status: "error",
-          message: error instanceof Error ? error.message : "Unknown error",
-        })
-      }
-
-      // Ensure we always return an array
-      const popularSearches = Array.isArray(data) ? data : data ? [data] : MOCK_POPULAR_SEARCHES
-
-      return NextResponse.json({
-        popularSearches,
-        status: "success",
-      })
+    if (!query) {
+      return NextResponse.json({ results: [] })
     }
 
-    // Handle trends
-    if (type === "trends") {
-      const { data, error } = await getSearchTrends()
+    // Perform search based on type
+    const { results, error } = await performSearch(query, { type })
 
-      if (error) {
-        console.error("Error fetching search trends:", error)
-        return NextResponse.json({
-          trends: MOCK_SEARCH_TRENDS,
-          status: "error",
-          message: error instanceof Error ? error.message : "Unknown error",
-        })
-      }
-
-      // Ensure we always return an array
-      const trends = Array.isArray(data) ? data : data ? [data] : MOCK_SEARCH_TRENDS
-
-      return NextResponse.json({
-        trends,
-        status: "success",
-      })
+    if (error) {
+      console.error("Search error:", error)
+      return NextResponse.json({ error: "Failed to perform search", details: error.message }, { status: 500 })
     }
 
-    // Default response for other GET requests
-    return NextResponse.json({
-      message: "Use POST for search queries or specify type parameter",
-      status: "info",
-    })
+    return NextResponse.json({ results, searchType: type })
   } catch (error) {
-    console.error("Error in search API GET:", error)
-    // Return appropriate mock data based on the requested type
-    const url = new URL(req.url)
-    const type = url.searchParams.get("type")
-
-    if (type === "popular") {
-      return NextResponse.json({
-        popularSearches: MOCK_POPULAR_SEARCHES,
-        status: "error",
-        message: error instanceof Error ? error.message : "Unknown error",
-      })
-    } else if (type === "trends") {
-      return NextResponse.json({
-        trends: MOCK_SEARCH_TRENDS,
-        status: "error",
-        message: error instanceof Error ? error.message : "Unknown error",
-      })
-    }
-
-    return NextResponse.json({
-      message: "Error processing search request",
-      error: error instanceof Error ? error.message : "Unknown error",
-      status: "error",
-    })
+    console.error("Unexpected error in search route:", error)
+    return NextResponse.json(
+      { error: "An unexpected error occurred", details: error instanceof Error ? error.message : String(error) },
+      { status: 500 },
+    )
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { query, filters = {} } = body
+
+    // Check if we should use mock data
+    const useMockData = shouldUseMockData()
 
     if (!query) {
       return NextResponse.json(
@@ -102,6 +61,15 @@ export async function POST(req: Request) {
       )
     }
 
+    // If we should use mock data, return mock search results immediately
+    if (useMockData) {
+      return NextResponse.json({
+        results: MOCK_SEARCH_RESULTS,
+        status: "success",
+        isMockData: true,
+      })
+    }
+
     const { results, error } = await performSearch(query, filters)
 
     if (error) {
@@ -110,6 +78,7 @@ export async function POST(req: Request) {
         results: MOCK_SEARCH_RESULTS,
         status: "error",
         message: error instanceof Error ? error.message : "Unknown error",
+        isMockData: true,
       })
     }
 
@@ -127,6 +96,7 @@ export async function POST(req: Request) {
       results: MOCK_SEARCH_RESULTS,
       status: "error",
       message: error instanceof Error ? error.message : "Unknown error",
+      isMockData: true,
     })
   }
 }

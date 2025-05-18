@@ -1,5 +1,7 @@
 import { validateEnvVar } from "@/lib/env-validator"
 import { logError } from "@/lib/error-handler"
+import { shouldUseMockData } from "@/lib/environment"
+import { getMockEmbeddings } from "@/lib/mock-data"
 
 /**
  * Generate embeddings for text using OpenAI
@@ -8,6 +10,12 @@ import { logError } from "@/lib/error-handler"
  */
 export async function generateEmbeddings(text: string): Promise<number[]> {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      console.log("[MOCK] Using mock embeddings")
+      return getMockEmbeddings(text)
+    }
+
     // Validate OpenAI API key
     validateEnvVar("OPENAI_API_KEY")
 
@@ -36,6 +44,12 @@ export async function generateEmbeddings(text: string): Promise<number[]> {
 export async function embedWithRetry(text: string, maxRetries = 3): Promise<number[]> {
   let retries = 0
   let lastError: any = null
+
+  // If using mock data, return mock embeddings immediately without retries
+  if (shouldUseMockData()) {
+    console.log("[MOCK] Using mock embeddings (no retry needed)")
+    return getMockEmbeddings(text)
+  }
 
   while (retries < maxRetries) {
     try {

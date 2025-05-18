@@ -3,10 +3,20 @@
  * Centralizes all feedback-related API functionality
  */
 import { createClient } from "@/lib/supabase/server"
+import { shouldUseMockData } from "@/lib/environment"
+import { MOCK_FEEDBACK } from "@/lib/mock-data"
 
 // Get all feedback
 export async function getAllFeedback() {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      return {
+        data: MOCK_FEEDBACK,
+        isMockData: true,
+      }
+    }
+
     const supabase = createClient()
 
     // Check if the feedback table exists
@@ -43,6 +53,23 @@ export async function getAllFeedback() {
 // Get feedback by ID
 export async function getFeedbackById(id: string) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      const mockFeedback = MOCK_FEEDBACK.find((f) => f.id === id)
+      if (!mockFeedback) {
+        return {
+          error: {
+            message: "Feedback not found",
+          },
+        }
+      }
+
+      return {
+        data: mockFeedback,
+        isMockData: true,
+      }
+    }
+
     const supabase = createClient()
     const { data, error } = await supabase.from("feedback").select("*").eq("id", id).single()
 
@@ -61,6 +88,17 @@ export async function getFeedbackById(id: string) {
 // Submit feedback
 export async function submitFeedback(feedback: any) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      return {
+        data: {
+          id: `feedback-${Date.now()}`,
+          ...feedback,
+        },
+        isMockData: true,
+      }
+    }
+
     const supabase = createClient()
     const { data, error } = await supabase.from("feedback").insert(feedback).select().single()
 
@@ -79,6 +117,18 @@ export async function submitFeedback(feedback: any) {
 // Update feedback
 export async function updateFeedback(id: string, updates: any) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      return {
+        data: {
+          id,
+          ...updates,
+          updated_at: new Date().toISOString(),
+        },
+        isMockData: true,
+      }
+    }
+
     const supabase = createClient()
     const { data, error } = await supabase.from("feedback").update(updates).eq("id", id).select().single()
 
@@ -97,6 +147,14 @@ export async function updateFeedback(id: string, updates: any) {
 // Delete feedback
 export async function deleteFeedback(id: string) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      return {
+        success: true,
+        isMockData: true,
+      }
+    }
+
     const supabase = createClient()
     const { error } = await supabase.from("feedback").delete().eq("id", id)
 
@@ -115,6 +173,18 @@ export async function deleteFeedback(id: string) {
 // Get feedback stats
 export async function getFeedbackStats() {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      return {
+        data: {
+          totalCount: MOCK_FEEDBACK.length,
+          averageRating: 4.2,
+          ratingDistribution: { 1: 1, 2: 2, 3: 3, 4: 5, 5: 10 },
+        },
+        isMockData: true,
+      }
+    }
+
     const supabase = createClient()
 
     // Get total feedback count

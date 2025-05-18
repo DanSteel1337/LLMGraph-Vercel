@@ -18,6 +18,10 @@ import {
 import { apiClient } from "@/lib/api-client"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { logError } from "@/lib/error-handler"
+import { shouldUseMockData } from "@/lib/environment"
+import { MOCK_SEARCH_TRENDS } from "@/lib/mock-data"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 // Type for search trend data
 interface SearchTrend {
@@ -31,22 +35,42 @@ export function SearchTrends() {
   const [error, setError] = useState<string | null>(null)
   const [period, setPeriod] = useState("week")
   const [chartType, setChartType] = useState("line")
+  const [isMockData, setIsMockData] = useState(false)
 
   useEffect(() => {
     async function fetchSearchTrends() {
       try {
         setLoading(true)
+
+        // Check if we should use mock data based on environment
+        if (shouldUseMockData()) {
+          // Use mock data directly
+          setTrends(MOCK_SEARCH_TRENDS)
+          setIsMockData(true)
+          setLoading(false)
+          return
+        }
+
         // Updated to use the consolidated analytics route
-        const response = await apiClient.analytics.getSearchTrends(period)
+        const response = await apiClient.get(`/api/analytics/search-trends?period=${period}`)
 
         if (response.error) {
           throw new Error(response.error)
+        }
+
+        // Check if the response indicates it's mock data
+        if (response.isMockData) {
+          setIsMockData(true)
         }
 
         setTrends(response.data)
       } catch (err) {
         logError(err, "search_trends_fetch_error")
         setError(err instanceof Error ? err.message : "Failed to load search trends")
+
+        // Use mock data as fallback
+        setTrends(MOCK_SEARCH_TRENDS)
+        setIsMockData(true)
       } finally {
         setLoading(false)
       }
@@ -79,6 +103,12 @@ export function SearchTrends() {
           <div className="flex h-[300px] items-center justify-center text-red-500">{error}</div>
         ) : (
           <div>
+            {isMockData && (
+              <Alert variant="warning" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>Showing mock data in preview environment</AlertDescription>
+              </Alert>
+            )}
             <div className="mb-4 flex justify-end">
               <Tabs defaultValue="line" onValueChange={setChartType}>
                 <TabsList>

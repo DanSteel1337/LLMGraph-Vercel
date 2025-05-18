@@ -1,5 +1,7 @@
 "use client"
 
+import { Badge } from "@/components/ui/badge"
+
 import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
@@ -18,19 +20,22 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts"
-import { Loader2 } from "lucide-react"
+import { Loader2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 export function AdvancedAnalytics() {
   const [period, setPeriod] = useState("week")
   const [analyticsData, setAnalyticsData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isMockData, setIsMockData] = useState(false)
 
   useEffect(() => {
     async function fetchAnalytics() {
       try {
         setIsLoading(true)
         setError(null)
+        setIsMockData(false)
 
         const response = await fetch(`/api/analytics/search?period=${period}&metric=all`)
 
@@ -39,6 +44,12 @@ export function AdvancedAnalytics() {
         }
 
         const data = await response.json()
+
+        // Check if the response contains mock data
+        if (data.isMockData) {
+          setIsMockData(true)
+        }
+
         setAnalyticsData(data)
       } catch (error) {
         console.error("Error fetching analytics:", error)
@@ -70,6 +81,16 @@ export function AdvancedAnalytics() {
 
   return (
     <div className="space-y-6">
+      {isMockData && (
+        <Alert variant="warning">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Preview Mode</AlertTitle>
+          <AlertDescription>
+            You are viewing mock analytics data. Connect to a database in production for real analytics.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Search Analytics</h2>
         <Select value={period} onValueChange={setPeriod}>
@@ -234,12 +255,14 @@ function VectorSpaceVisualization() {
   const [category, setCategory] = useState<string | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hoveredVector, setHoveredVector] = useState<any>(null)
+  const [isMockData, setIsMockData] = useState(false)
 
   useEffect(() => {
     async function fetchVectorData() {
       try {
         setIsLoading(true)
         setError(null)
+        setIsMockData(false)
 
         const url = new URL("/api/analytics/vectors", window.location.origin)
         if (category) {
@@ -253,6 +276,12 @@ function VectorSpaceVisualization() {
         }
 
         const data = await response.json()
+
+        // Check if the response contains mock data
+        if (data.isMockData) {
+          setIsMockData(true)
+        }
+
         setVectorData(data)
       } catch (error) {
         console.error("Error fetching vector data:", error)
@@ -350,6 +379,13 @@ function VectorSpaceVisualization() {
             </div>
           ) : (
             <>
+              {isMockData && (
+                <div className="absolute top-2 right-2 z-10">
+                  <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300">
+                    Mock Data
+                  </Badge>
+                </div>
+              )}
               <canvas
                 ref={canvasRef}
                 className="w-full h-full"

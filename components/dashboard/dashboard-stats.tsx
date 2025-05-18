@@ -6,7 +6,8 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { FileText, Search, MessageSquare, Database, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { fetchData } from "@/lib/api-client"
+import { apiClient } from "@/lib/api-client"
+import { shouldUseMockData } from "@/lib/environment"
 
 interface StatsData {
   totalDocuments: number
@@ -46,8 +47,8 @@ export function DashboardStats() {
           typeof window !== "undefined" &&
           (window.location.pathname === "/login" || window.location.pathname === "/signup")
 
-        // Use mock data if on login page or if env var is set
-        if (isLoginPage || process.env.USE_MOCK_DATA === "true") {
+        // Use mock data if on login page or if we should use mock data based on environment
+        if (isLoginPage || shouldUseMockData()) {
           // Simulate network delay
           await new Promise((resolve) => setTimeout(resolve, 500))
           setStats(MOCK_STATS)
@@ -56,11 +57,19 @@ export function DashboardStats() {
         }
 
         // Fetch real data from API
-        const data = await fetchData<StatsData>("/api/system?type=stats", {
-          requiresAuth: true,
+        const response = await apiClient.get<StatsData>("/api/system", {
+          params: { type: "stats" },
         })
 
-        setStats(data)
+        if (response.error) {
+          throw new Error(response.error)
+        }
+
+        setStats(response.data)
+        // Check if the response contains mock data flag
+        if (response.isMockData) {
+          setIsMockData(true)
+        }
       } catch (error) {
         console.error("Failed to fetch stats:", error)
         setError("Failed to fetch stats: " + (error instanceof Error ? error.message : String(error)))
@@ -96,7 +105,9 @@ export function DashboardStats() {
         </Button>
       </div>
 
-      {isMockData && error && <div className="text-sm text-amber-600 mb-2">Showing mock data. Error: {error}</div>}
+      {isMockData && (
+        <div className="text-sm text-amber-600 mb-2">Showing mock data{error ? `. Error: ${error}` : ""}</div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard

@@ -2,9 +2,21 @@ import { NextResponse } from "next/server"
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { getSystemStats } from "@/lib/api-handlers/system"
+import { shouldUseMockData } from "@/lib/environment"
+import { MOCK_STATS } from "@/lib/mock-data"
+
+export const runtime = "edge"
 
 export async function GET(request: Request) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      return NextResponse.json({
+        ...MOCK_STATS,
+        isMockData: true,
+      })
+    }
+
     // Create Supabase client
     const supabase = createRouteHandlerClient({ cookies })
 
@@ -31,6 +43,8 @@ export async function GET(request: Request) {
       {
         error: "Failed to fetch stats",
         message: error instanceof Error ? error.message : String(error),
+        ...MOCK_STATS,
+        isMockData: true,
       },
       { status: 500 },
     )

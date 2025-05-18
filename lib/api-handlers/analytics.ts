@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase/client"
 import { MOCK_CATEGORY_DISTRIBUTION, MOCK_SEARCH_TRENDS, ensureArray } from "@/lib/mock-data"
+import { shouldUseMockData } from "@/lib/environment"
 
 /**
  * Get category distribution data
@@ -7,8 +8,11 @@ import { MOCK_CATEGORY_DISTRIBUTION, MOCK_SEARCH_TRENDS, ensureArray } from "@/l
 export async function getCategoryDistribution() {
   try {
     // Check if we should use mock data
-    if (process.env.USE_MOCK_DATA === "true") {
-      return { data: MOCK_CATEGORY_DISTRIBUTION }
+    if (shouldUseMockData()) {
+      return {
+        data: MOCK_CATEGORY_DISTRIBUTION,
+        isMockData: true,
+      }
     }
 
     // Query the database for document categories
@@ -20,7 +24,11 @@ export async function getCategoryDistribution() {
 
     if (error) {
       console.error("Error fetching category distribution from database:", error)
-      return { data: MOCK_CATEGORY_DISTRIBUTION, error }
+      return {
+        data: MOCK_CATEGORY_DISTRIBUTION,
+        error,
+        isMockData: true,
+      }
     }
 
     // Process the data and ensure it's an array
@@ -32,7 +40,11 @@ export async function getCategoryDistribution() {
     return { data: categoryData }
   } catch (error) {
     console.error("Error in getCategoryDistribution:", error)
-    return { data: MOCK_CATEGORY_DISTRIBUTION, error }
+    return {
+      data: MOCK_CATEGORY_DISTRIBUTION,
+      error,
+      isMockData: true,
+    }
   }
 }
 
@@ -67,8 +79,11 @@ export async function getSearchTrends(period = "week") {
     const startDateStr = startDate.toISOString().split("T")[0]
 
     // Check if we should use mock data
-    if (process.env.USE_MOCK_DATA === "true") {
-      return { data: MOCK_SEARCH_TRENDS }
+    if (shouldUseMockData()) {
+      return {
+        data: MOCK_SEARCH_TRENDS,
+        isMockData: true,
+      }
     }
 
     // Query the database for search trends
@@ -80,17 +95,28 @@ export async function getSearchTrends(period = "week") {
 
     if (error) {
       console.error("Error fetching search trends from database:", error)
-      return { data: MOCK_SEARCH_TRENDS, error }
+      return {
+        data: MOCK_SEARCH_TRENDS,
+        error,
+        isMockData: true,
+      }
     }
 
     // Process the data to get daily aggregates
     const dailyData = processSearchTrendsData(ensureArray(data, []))
 
     // If no data was found, return mock data
-    return { data: dailyData.length > 0 ? dailyData : MOCK_SEARCH_TRENDS }
+    return {
+      data: dailyData.length > 0 ? dailyData : MOCK_SEARCH_TRENDS,
+      isMockData: dailyData.length === 0,
+    }
   } catch (error) {
     console.error("Error in getSearchTrends:", error)
-    return { data: MOCK_SEARCH_TRENDS, error }
+    return {
+      data: MOCK_SEARCH_TRENDS,
+      error,
+      isMockData: true,
+    }
   }
 }
 

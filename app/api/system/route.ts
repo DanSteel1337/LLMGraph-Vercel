@@ -3,17 +3,32 @@ import {
   checkDatabaseConnection,
   checkPineconeConnection,
   getSystemStats,
-  getHealthStatus,
+  getSystemStatus,
 } from "@/lib/api-handlers/system"
-import { MOCK_STATS } from "@/lib/mock-data"
+import { MOCK_STATS } from "@/lib"
+import { shouldUseMockData } from "@/lib"
 
-export const runtime = "nodejs" // Use Node.js runtime for Supabase
+export const runtime = "edge" // Use Edge runtime for better performance
 
 // Main system endpoint
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const type = searchParams.get("type") || "health"
+
+    // Use mock data in preview environments
+    if (shouldUseMockData()) {
+      return NextResponse.json({
+        status: "healthy",
+        stats: MOCK_STATS,
+        isMockData: true,
+        timestamp: new Date().toISOString(),
+        services: {
+          database: { status: "ok", message: "Connected (Mock)" },
+          pinecone: { status: "ok", message: "Operational (Mock)" },
+        },
+      })
+    }
 
     // Handle different system-related requests
     switch (type) {
@@ -28,12 +43,21 @@ export async function GET(req: NextRequest) {
               ...MOCK_STATS,
               status: "error",
               message: error instanceof Error ? error.message : "Unknown error",
+              isMockData: true,
+              services: {
+                database: { status: "error", message: "Error fetching stats" },
+                pinecone: { status: "warning", message: "Status unknown" },
+              },
             })
           }
 
           return NextResponse.json({
             ...data,
             status: "success",
+            services: data.services || {
+              database: { status: "ok", message: "Connected" },
+              pinecone: { status: "ok", message: "Operational" },
+            },
           })
         } catch (error) {
           console.error("Error getting system stats:", error)
@@ -42,6 +66,11 @@ export async function GET(req: NextRequest) {
             ...MOCK_STATS,
             status: "error",
             message: error instanceof Error ? error.message : "Unknown error",
+            isMockData: true,
+            services: {
+              database: { status: "error", message: "Error fetching stats" },
+              pinecone: { status: "warning", message: "Status unknown" },
+            },
           })
         }
 
@@ -56,6 +85,12 @@ export async function GET(req: NextRequest) {
               return NextResponse.json({
                 ...dbStatus,
                 status: dbStatus.connected ? "success" : "error",
+                services: {
+                  database: {
+                    status: dbStatus.connected ? "ok" : "error",
+                    message: dbStatus.message || (dbStatus.connected ? "Connected" : "Connection failed"),
+                  },
+                },
               })
             }
           }
@@ -67,6 +102,12 @@ export async function GET(req: NextRequest) {
               return NextResponse.json({
                 ...pineconeStatus,
                 status: pineconeStatus.connected ? "success" : "error",
+                services: {
+                  pinecone: {
+                    status: pineconeStatus.connected ? "ok" : "error",
+                    message: pineconeStatus.message || (pineconeStatus.connected ? "Operational" : "Connection failed"),
+                  },
+                },
               })
             }
           }
@@ -85,6 +126,16 @@ export async function GET(req: NextRequest) {
                 status: pineconeStatus.connected ? "success" : "error",
               },
               status: dbStatus.connected && pineconeStatus.connected ? "success" : "error",
+              services: {
+                database: {
+                  status: dbStatus.connected ? "ok" : "error",
+                  message: dbStatus.message || (dbStatus.connected ? "Connected" : "Connection failed"),
+                },
+                pinecone: {
+                  status: pineconeStatus.connected ? "ok" : "error",
+                  message: pineconeStatus.message || (pineconeStatus.connected ? "Operational" : "Connection failed"),
+                },
+              },
             })
           }
 
@@ -92,6 +143,7 @@ export async function GET(req: NextRequest) {
             {
               error: "Invalid target",
               status: "error",
+              services: {},
             },
             { status: 400 },
           )
@@ -103,36 +155,60 @@ export async function GET(req: NextRequest) {
             pinecone: { status: "error", message: "Error checking Pinecone" },
             status: "error",
             message: error instanceof Error ? error.message : "Unknown error",
+            isMockData: true,
+            services: {
+              database: { status: "error", message: "Error checking database" },
+              pinecone: { status: "error", message: "Error checking Pinecone" },
+            },
           })
         }
 
       case "health":
       default:
         try {
-          const { data, error } = await getHealthStatus()
+          const { status, stats, error } = await getSystemStatus()
 
           if (error) {
-            console.error("Health error:", error)
-            // Return mock health data instead of error
-            return NextResponse.json({
-              status: "error",
-              message: error instanceof Error ? error.message : "Unknown error",
-              timestamp: new Date().toISOString(),
-            })
+            console.error("Error fetching system status:", error)
+            return NextResponse.json(
+              {
+                error: "Failed to fetch system status",
+                details: error.message,
+                status: "error",
+                services: {
+                  database: { status: "warning", message: "Status unknown" },
+                  pinecone: { status: "warning", message: "Status unknown" },
+                },
+                timestamp: new Date().toISOString(),
+              },
+              { status: 500 },
+            )
           }
 
           return NextResponse.json({
-            ...data,
-            status: data.status === "healthy" ? "success" : "error",
+            status,
+            stats,
+            timestamp: new Date().toISOString(),
+            services: stats?.services || {
+              database: { status: "ok", message: "Connected" },
+              pinecone: { status: "ok", message: "Operational" },
+            },
           })
         } catch (error) {
-          console.error("Error checking health status:", error)
-          // Return mock health data on error
-          return NextResponse.json({
-            status: "error",
-            message: error instanceof Error ? error.message : "Unknown error",
-            timestamp: new Date().toISOString(),
-          })
+          console.error("Unexpected error in system status route:", error)
+          return NextResponse.json(
+            {
+              error: "An unexpected error occurred",
+              details: error instanceof Error ? error.message : String(error),
+              status: "error",
+              services: {
+                database: { status: "warning", message: "Status unknown" },
+                pinecone: { status: "warning", message: "Status unknown" },
+              },
+              timestamp: new Date().toISOString(),
+            },
+            { status: 500 },
+          )
         }
     }
   } catch (error) {
@@ -142,6 +218,11 @@ export async function GET(req: NextRequest) {
       status: "error",
       message: error instanceof Error ? error.message : "Unknown error",
       timestamp: new Date().toISOString(),
+      isMockData: true,
+      services: {
+        database: { status: "error", message: "Error checking database" },
+        pinecone: { status: "error", message: "Error checking Pinecone" },
+      },
     })
   }
 }

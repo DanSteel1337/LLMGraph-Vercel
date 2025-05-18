@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { CheckCircle, XCircle, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { apiClient } from "@/lib/api-client"
+import { apiClient, shouldUseMockData } from "@/lib"
 
 // Inline mock data for development and fallback
 const mockSystemStatus = {
@@ -15,6 +15,7 @@ const mockSystemStatus = {
     database: { status: "ok", message: "Connected" },
     pinecone: { status: "ok", message: "Operational" },
   },
+  isMockData: true,
 }
 
 interface ServiceStatus {
@@ -30,6 +31,7 @@ interface HealthCheckResponse {
     pinecone?: ServiceStatus
     // Add other services as needed
   }
+  isMockData?: boolean
 }
 
 function SystemStatus() {
@@ -43,23 +45,29 @@ function SystemStatus() {
 
     try {
       // Use the API client to fetch health status
-      const response = await apiClient.get("/api/system?type=health")
+      const response = await apiClient.get<HealthCheckResponse>("/api/system", {
+        params: { type: "health" },
+      })
 
-      if (!response.ok) {
-        throw new Error(`Health check failed: ${response.status}`)
+      if (response.error) {
+        throw new Error(`Health check failed: ${response.error}`)
       }
 
-      const data = await response.json()
-
       // Handle different response formats
-      const healthData = data.data || data
+      const healthData = response.data
+
+      // Validate the health data structure
+      if (!healthData || !healthData.services) {
+        throw new Error("Invalid health data format received")
+      }
+
       setHealth(healthData)
     } catch (err) {
       console.error("Error fetching health status:", err)
       setError(err instanceof Error ? err.message : "Unknown error")
 
-      // Use mock data as fallback in development
-      if (process.env.NODE_ENV === "development") {
+      // Use mock data as fallback in development or preview
+      if (shouldUseMockData()) {
         console.info("Using mock health data as fallback")
         setHealth(mockSystemStatus)
       }
@@ -83,11 +91,21 @@ function SystemStatus() {
     }
   }
 
+  // If we're in a preview environment and have an error, use mock data
+  useEffect(() => {
+    if (error && shouldUseMockData() && !health) {
+      setHealth(mockSystemStatus)
+    }
+  }, [error, health])
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>System Status</CardTitle>
         <CardDescription>Current status of system components</CardDescription>
+        {health?.isMockData && (
+          <div className="mt-1 text-xs text-amber-500">Using mock data. Connect to real services for live status.</div>
+        )}
       </CardHeader>
       <CardContent>
         {loading ? (

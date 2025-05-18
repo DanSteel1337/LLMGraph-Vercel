@@ -5,11 +5,15 @@
  * All components should use these methods instead of direct fetch calls.
  */
 
+import { shouldUseMockData } from "@/lib/environment"
+import { MOCK_DOCUMENTS, MOCK_POPULAR_SEARCHES, MOCK_SEARCH_TRENDS, MOCK_SYSTEM_STATUS } from "@/lib/mock-data"
+
 // Types
 type ApiResponse<T> = {
   success: boolean
   data?: T
   error?: string
+  isMockData?: boolean
 }
 
 // Base API URL
@@ -24,6 +28,46 @@ const handleApiError = (error: unknown): string => {
 
 // Generic fetch wrapper with error handling
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
+  // Check if we should use mock data
+  if (shouldUseMockData()) {
+    // Return mock data based on the endpoint
+    if (endpoint === "/documents") {
+      return {
+        success: true,
+        data: MOCK_DOCUMENTS as unknown as T,
+        isMockData: true,
+      }
+    }
+    if (endpoint === "/search/popular") {
+      return {
+        success: true,
+        data: MOCK_POPULAR_SEARCHES as unknown as T,
+        isMockData: true,
+      }
+    }
+    if (endpoint === "/search/trends") {
+      return {
+        success: true,
+        data: MOCK_SEARCH_TRENDS as unknown as T,
+        isMockData: true,
+      }
+    }
+    if (endpoint === "/system/status") {
+      return {
+        success: true,
+        data: MOCK_SYSTEM_STATUS as unknown as T,
+        isMockData: true,
+      }
+    }
+
+    // Default mock response for other endpoints
+    return {
+      success: true,
+      data: {} as T,
+      isMockData: true,
+    }
+  }
+
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
@@ -45,6 +89,7 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<Api
     return {
       success: true,
       data: data as T,
+      isMockData: data.isMockData || false,
     }
   } catch (error) {
     return {

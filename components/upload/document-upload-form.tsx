@@ -11,8 +11,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Upload } from "lucide-react"
+import { Loader2, Upload, AlertCircle } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
+import { shouldUseMockData } from "@/lib/environment"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { apiClient } from "@/lib/api-client"
 
 export function DocumentUploadForm() {
   const [file, setFile] = useState<File | null>(null)
@@ -22,8 +25,12 @@ export function DocumentUploadForm() {
   const [description, setDescription] = useState("")
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [isMockData, setIsMockData] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+
+  // Check if we should use mock data
+  const useMockData = shouldUseMockData()
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -92,13 +99,6 @@ export function DocumentUploadForm() {
     setUploadProgress(0)
 
     try {
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("title", title)
-      formData.append("category", category)
-      formData.append("version", version)
-      formData.append("description", description)
-
       // Simulate progress updates
       const progressInterval = setInterval(() => {
         setUploadProgress((prev) => {
@@ -110,10 +110,36 @@ export function DocumentUploadForm() {
         })
       }, 500)
 
-      const response = await fetch("/api/documents", {
-        method: "POST",
-        body: formData,
-      })
+      // Check if we should use mock data
+      if (useMockData) {
+        // Simulate upload delay
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+        clearInterval(progressInterval)
+        setUploadProgress(100)
+        setIsMockData(true)
+
+        toast({
+          title: "Document uploaded successfully (Mock)",
+          description: "Your document has been uploaded and is being processed",
+        })
+
+        // Redirect to documents page after a short delay
+        setTimeout(() => {
+          router.push("/documents")
+          router.refresh()
+        }, 1500)
+
+        return
+      }
+
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("title", title)
+      formData.append("category", category)
+      formData.append("version", version)
+      formData.append("description", description)
+
+      const response = await apiClient.postFormData("/documents", formData)
 
       clearInterval(progressInterval)
 
@@ -121,6 +147,8 @@ export function DocumentUploadForm() {
         throw new Error(`Upload failed: ${response.statusText}`)
       }
 
+      const data = await response.json()
+      setIsMockData(data.isMockData || false)
       setUploadProgress(100)
 
       toast({
@@ -153,6 +181,14 @@ export function DocumentUploadForm() {
           <CardDescription>Upload a document to be indexed and searchable</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {useMockData && (
+            <Alert variant="warning" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Preview Mode</AlertTitle>
+              <AlertDescription>You are in preview mode. Document uploads will be simulated.</AlertDescription>
+            </Alert>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="file">Document File</Label>
             <Input

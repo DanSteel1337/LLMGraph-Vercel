@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react"
 import { formatDate } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
-import { fetchData } from "@/lib/api-client"
+import { apiClient } from "@/lib/api-client"
+import { shouldUseMockData } from "@/lib/environment"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 interface RecentDocumentsProps {
   limit?: number
@@ -64,13 +67,8 @@ export function RecentDocuments({ limit = 5 }: RecentDocumentsProps) {
         setError(null)
         setIsMockData(false)
 
-        // Check if we're on the login page
-        const isLoginPage =
-          typeof window !== "undefined" &&
-          (window.location.pathname === "/login" || window.location.pathname === "/signup")
-
-        // Use mock data if on login page or if env var is set
-        if (isLoginPage || process.env.USE_MOCK_DATA === "true") {
+        // Check if we should use mock data
+        if (shouldUseMockData()) {
           // Simulate network delay
           await new Promise((resolve) => setTimeout(resolve, 500))
           setDocuments(MOCK_DOCUMENTS.slice(0, limit))
@@ -78,19 +76,31 @@ export function RecentDocuments({ limit = 5 }: RecentDocumentsProps) {
           return
         }
 
-        // Fetch documents from API
-        const data = await fetchData<Document[]>("/api/documents", {
-          requiresAuth: true,
-        })
+        // Fetch documents from API using apiClient
+        const response = await apiClient.get<Document[]>("/api/documents")
+
+        if (response.error) {
+          throw new Error(response.error)
+        }
+
+        // Check if the response contains mock data
+        if (response.isMockData) {
+          setIsMockData(true)
+        }
 
         // Sort by created_at and limit
-        const sortedDocuments = data
+        const sortedDocuments = response.data
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
           .slice(0, limit)
 
         setDocuments(sortedDocuments)
       } catch (err) {
         setError("Failed to fetch documents")
+        console.error("Error fetching documents:", err)
+
+        // Use mock data as fallback
+        setDocuments(MOCK_DOCUMENTS.slice(0, limit))
+        setIsMockData(true)
       } finally {
         setIsLoading(false)
       }
@@ -110,16 +120,26 @@ export function RecentDocuments({ limit = 5 }: RecentDocumentsProps) {
       )}
       {error && <div>{error}</div>}
       {!isLoading && !error && (
-        <ul>
-          {Array.isArray(documents) &&
-            documents.map((doc) => (
-              <li key={doc.id}>
-                <h3>{doc.title}</h3>
-                <p>{doc.category}</p>
-                <p>{formatDate(doc?.created_at, "N/A")}</p>
-              </li>
-            ))}
-        </ul>
+        <>
+          {isMockData && (
+            <Alert variant="warning" className="mb-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                Showing mock data. Connect to a database in production.
+              </AlertDescription>
+            </Alert>
+          )}
+          <ul>
+            {Array.isArray(documents) &&
+              documents.map((doc) => (
+                <li key={doc.id}>
+                  <h3>{doc.title}</h3>
+                  <p>{doc.category}</p>
+                  <p>{formatDate(doc?.created_at, "N/A")}</p>
+                </li>
+              ))}
+          </ul>
+        </>
       )}
     </div>
   )

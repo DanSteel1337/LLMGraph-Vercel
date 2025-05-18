@@ -2,9 +2,9 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getCategoryDistribution, getSearchTrends } from "@/lib/api-handlers/analytics"
 import { MOCK_CATEGORY_DISTRIBUTION, MOCK_SEARCH_TRENDS } from "@/lib/mock-data"
 import { logError } from "@/lib/error-handler"
-import { validateEnvVar } from "@/lib/env-validator"
+import { shouldUseMockData } from "@/lib/environment"
 
-export const runtime = "nodejs" // Use Node.js runtime for Supabase
+export const runtime = "edge"
 
 /**
  * GET handler for analytics data
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type") || "category-distribution"
 
     // Check if we should use mock data
-    const useMockData = validateEnvVar("USE_MOCK_DATA", false) === "true"
+    const useMockData = shouldUseMockData()
 
     if (type === "category-distribution") {
       return handleCategoryDistribution(useMockData)
@@ -50,6 +50,7 @@ async function handleCategoryDistribution(useMockData: boolean) {
       return NextResponse.json({
         categories: MOCK_CATEGORY_DISTRIBUTION,
         status: "success",
+        isMockData: true,
       })
     }
 
@@ -62,6 +63,7 @@ async function handleCategoryDistribution(useMockData: boolean) {
         categories: MOCK_CATEGORY_DISTRIBUTION,
         status: "error",
         message: error instanceof Error ? error.message : "Unknown error",
+        isMockData: true,
       })
     }
 
@@ -79,6 +81,7 @@ async function handleCategoryDistribution(useMockData: boolean) {
       categories: MOCK_CATEGORY_DISTRIBUTION,
       status: "error",
       message: error instanceof Error ? error.message : "Unknown error",
+      isMockData: true,
     })
   }
 }
@@ -93,6 +96,7 @@ async function handleSearchTrends(period: string, useMockData: boolean) {
       return NextResponse.json({
         trends: MOCK_SEARCH_TRENDS,
         status: "success",
+        isMockData: true,
       })
     }
 
@@ -104,6 +108,7 @@ async function handleSearchTrends(period: string, useMockData: boolean) {
         trends: MOCK_SEARCH_TRENDS,
         status: "error",
         message: error instanceof Error ? error.message : "Unknown error",
+        isMockData: true,
       })
     }
 
@@ -121,6 +126,7 @@ async function handleSearchTrends(period: string, useMockData: boolean) {
       trends: MOCK_SEARCH_TRENDS,
       status: "error",
       message: error instanceof Error ? error.message : "Unknown error",
+      isMockData: true,
     })
   }
 }

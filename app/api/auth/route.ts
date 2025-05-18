@@ -1,13 +1,39 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { handleAuthCallback, isUserAdmin, getCurrentSession } from "@/lib/api-handlers/auth"
+import { shouldUseMockData } from "@/lib/environment"
 
-export const runtime = "nodejs" // Use Node.js runtime for Supabase
+export const runtime = "edge" // Use Edge runtime for better performance
 
 // Main auth endpoint
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const type = searchParams.get("type") || "session"
+
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      // Return mock data based on request type
+      switch (type) {
+        case "callback":
+          return NextResponse.json({ success: true, isMockData: true })
+        case "admin":
+          return NextResponse.json({ isAdmin: true, isMockData: true })
+        case "session":
+        default:
+          return NextResponse.json({
+            session: {
+              user: {
+                id: "mock-user-id",
+                email: "mock-user@example.com",
+                name: "Mock User",
+                role: "admin",
+              },
+              expires_at: Date.now() + 86400000, // 24 hours from now
+            },
+            isMockData: true,
+          })
+      }
+    }
 
     // Handle different auth-related requests
     switch (type) {

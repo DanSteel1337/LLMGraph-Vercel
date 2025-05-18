@@ -1,14 +1,50 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { shouldUseMockData } from "@/lib/environment"
 
 // We'll dynamically import PDF.js only on the client side
 let pdfjsLib: any = null
 
+// Mock text for development when in mock data mode
+const MOCK_PDF_TEXT = `# Unreal Engine Documentation
+
+## Introduction
+This is a sample document for the Unreal Engine documentation system. It demonstrates how text extraction would work in a real PDF.
+
+## Features
+- Real-time rendering
+- Blueprint visual scripting
+- C++ programming interface
+- Material editor
+- Landscape system
+- Animation tools
+
+## Getting Started
+To get started with Unreal Engine, you'll need to download the Epic Games Launcher and install the engine.
+
+## System Requirements
+- Windows 10 64-bit
+- macOS 10.15+
+- 8GB RAM minimum
+- Quad-core processor
+- DirectX 11 or Metal compatible graphics card
+
+Thank you for using our documentation system!
+`
+
 export function usePdfProcessor() {
   const [isReady, setIsReady] = useState(false)
+  const [isMockData, setIsMockData] = useState(false)
 
   useEffect(() => {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      setIsMockData(true)
+      setIsReady(true)
+      return
+    }
+
     // Only import PDF.js on the client side
     const loadPdfJs = async () => {
       try {
@@ -35,6 +71,13 @@ export function usePdfProcessor() {
   }, [])
 
   const extractTextFromPDF = async (arrayBuffer: ArrayBuffer): Promise<string> => {
+    // Return mock text if in mock data mode
+    if (isMockData) {
+      // Simulate processing delay
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      return MOCK_PDF_TEXT
+    }
+
     if (!isReady || !pdfjsLib) {
       throw new Error("PDF processor not ready")
     }
@@ -62,5 +105,6 @@ export function usePdfProcessor() {
   return {
     isReady,
     extractTextFromPDF,
+    isMockData,
   }
 }

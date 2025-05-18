@@ -4,17 +4,27 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, CheckCircle, RefreshCw } from "lucide-react"
+import { apiClient } from "@/lib/api-client"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export function EnvVarChecker() {
   const [checking, setChecking] = useState(false)
   const [results, setResults] = useState<any>(null)
+  const [isMockData, setIsMockData] = useState(false)
 
   const checkEnvVars = async () => {
     setChecking(true)
+    setIsMockData(false)
+
     try {
-      const response = await fetch("/api/test-db-connection")
-      const data = await response.json()
-      setResults(data)
+      const response = await apiClient.get("/api/test-db-connection")
+
+      // Check if the response contains mock data
+      if (response.isMockData) {
+        setIsMockData(true)
+      }
+
+      setResults(response.data)
     } catch (error) {
       console.error("Error checking environment variables:", error)
       setResults({ error: String(error) })
@@ -38,6 +48,15 @@ export function EnvVarChecker() {
           <div className="text-sm text-red-500">{results.error}</div>
         ) : (
           <div className="space-y-2">
+            {isMockData && (
+              <Alert variant="warning" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Showing mock diagnostic data. Connect to a real database in production.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-1">
               <div className="text-sm font-medium">Connection Test</div>
               <div className="flex items-center text-sm">

@@ -7,6 +7,10 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recha
 import { apiClient } from "@/lib/api-client"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { logError } from "@/lib/error-handler"
+import { shouldUseMockData } from "@/lib/environment"
+import { MOCK_CATEGORY_DISTRIBUTION } from "@/lib/mock-data"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 // Type for category data
 interface CategoryData {
@@ -23,22 +27,44 @@ export function CategoryDistribution() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("all")
+  const [isMockData, setIsMockData] = useState(false)
 
   useEffect(() => {
     async function fetchCategoryDistribution() {
       try {
         setLoading(true)
+
+        // Check if we should use mock data based on environment
+        if (shouldUseMockData()) {
+          // Process mock data
+          const mockData = MOCK_CATEGORY_DISTRIBUTION.map((category, index) => ({
+            name: category.category,
+            value: category.count,
+            color: COLORS[index % COLORS.length],
+          }))
+
+          setCategories(mockData)
+          setIsMockData(true)
+          setLoading(false)
+          return
+        }
+
         // Updated to use the consolidated analytics route
-        const response = await apiClient.analytics.getCategoryDistribution()
+        const response = await apiClient.get("/api/analytics/categories")
 
         if (response.error) {
           throw new Error(response.error)
         }
 
+        // Check if the response indicates it's mock data
+        if (response.isMockData) {
+          setIsMockData(true)
+        }
+
         // Process the data
         const processedData = response.data.map((category, index) => ({
-          name: category.name,
-          value: category.count,
+          name: category.name || category.category,
+          value: category.count || category.value,
           color: COLORS[index % COLORS.length],
         }))
 
@@ -46,6 +72,16 @@ export function CategoryDistribution() {
       } catch (err) {
         logError(err, "category_distribution_fetch_error")
         setError(err instanceof Error ? err.message : "Failed to load category distribution")
+
+        // Use mock data as fallback
+        const mockData = MOCK_CATEGORY_DISTRIBUTION.map((category, index) => ({
+          name: category.category,
+          value: category.count,
+          color: COLORS[index % COLORS.length],
+        }))
+
+        setCategories(mockData)
+        setIsMockData(true)
       } finally {
         setLoading(false)
       }
@@ -75,56 +111,64 @@ export function CategoryDistribution() {
         ) : error ? (
           <div className="flex h-[300px] items-center justify-center text-red-500">{error}</div>
         ) : (
-          <Tabs defaultValue="all" onValueChange={setActiveTab}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="all">All Categories</TabsTrigger>
-              <TabsTrigger value="top5">Top 5</TabsTrigger>
-            </TabsList>
-            <TabsContent value="all" className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={getFilteredCategories()}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={true}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {categories.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => [`${value} documents`, "Count"]} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </TabsContent>
-            <TabsContent value="top5" className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={getFilteredCategories()}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={true}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {getFilteredCategories().map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => [`${value} documents`, "Count"]} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </TabsContent>
-          </Tabs>
+          <>
+            {isMockData && (
+              <Alert variant="warning" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>Showing mock data in preview environment</AlertDescription>
+              </Alert>
+            )}
+            <Tabs defaultValue="all" onValueChange={setActiveTab}>
+              <TabsList className="mb-4">
+                <TabsTrigger value="all">All Categories</TabsTrigger>
+                <TabsTrigger value="top5">Top 5</TabsTrigger>
+              </TabsList>
+              <TabsContent value="all" className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={getFilteredCategories()}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={true}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {categories.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${value} documents`, "Count"]} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </TabsContent>
+              <TabsContent value="top5" className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={getFilteredCategories()}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={true}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {getFilteredCategories().map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${value} documents`, "Count"]} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </TabsContent>
+            </Tabs>
+          </>
         )}
       </CardContent>
     </Card>

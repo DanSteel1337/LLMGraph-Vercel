@@ -10,8 +10,9 @@ import {
   getDocumentVectors,
 } from "@/lib/api-handlers/documents"
 import { MOCK_DOCUMENTS } from "@/lib/mock-data"
+import { shouldUseMockData } from "@/lib/environment"
 
-export const runtime = "nodejs" // Use Node.js runtime for Supabase
+export const runtime = "edge"
 
 // Main documents endpoint
 export async function GET(req: NextRequest) {
@@ -19,6 +20,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const id = searchParams.get("id")
     const type = searchParams.get("type") || "document"
+
+    // Check if we should use mock data
+    const useMockData = shouldUseMockData()
 
     // Handle different document-related requests
     switch (type) {
@@ -32,6 +36,21 @@ export async function GET(req: NextRequest) {
             },
             { status: 400 },
           )
+        }
+
+        if (useMockData) {
+          return NextResponse.json({
+            chunks: [
+              {
+                id: "chunk-1",
+                documentId: id,
+                content: "This is a mock document chunk for testing purposes.",
+                metadata: { page: 1 },
+              },
+            ],
+            status: "success",
+            isMockData: true,
+          })
         }
 
         try {
@@ -74,6 +93,21 @@ export async function GET(req: NextRequest) {
           )
         }
 
+        if (useMockData) {
+          return NextResponse.json({
+            vectors: [
+              {
+                id: "vector-1",
+                documentId: id,
+                values: Array(10).fill(0.1),
+                metadata: { page: 1 },
+              },
+            ],
+            status: "success",
+            isMockData: true,
+          })
+        }
+
         try {
           const { data, error } = await getDocumentVectors(id)
 
@@ -105,6 +139,26 @@ export async function GET(req: NextRequest) {
       case "document":
       default:
         if (id) {
+          if (useMockData) {
+            const mockDocument = MOCK_DOCUMENTS.find((doc) => doc.id === id) || {
+              id,
+              title: "Mock Document",
+              description: "This is a mock document for testing purposes",
+              category: "Testing",
+              version: "1.0",
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              status: "published",
+              pageCount: 1,
+            }
+
+            return NextResponse.json({
+              document: mockDocument,
+              status: "success",
+              isMockData: true,
+            })
+          }
+
           try {
             const { data, error } = await getDocumentById(id)
 
@@ -131,6 +185,14 @@ export async function GET(req: NextRequest) {
             })
           }
         } else {
+          if (useMockData) {
+            return NextResponse.json({
+              documents: MOCK_DOCUMENTS,
+              status: "success",
+              isMockData: true,
+            })
+          }
+
           try {
             const { data, error } = await getDocuments()
 
@@ -141,11 +203,12 @@ export async function GET(req: NextRequest) {
                 documents: MOCK_DOCUMENTS,
                 status: "error",
                 message: error.message,
+                isMockData: true,
               })
             }
 
             // Ensure we always return an array
-            const documents = Array.isArray(data) ? data : data ? [data] : MOCK_DOCUMENTS
+            const documents = Array.isArray(data) ? data : data ? [data] : []
 
             return NextResponse.json({
               documents,
@@ -157,6 +220,7 @@ export async function GET(req: NextRequest) {
               documents: MOCK_DOCUMENTS,
               status: "error",
               message: error instanceof Error ? error.message : "Unknown error",
+              isMockData: true,
             })
           }
         }
@@ -168,6 +232,7 @@ export async function GET(req: NextRequest) {
       documents: MOCK_DOCUMENTS,
       status: "error",
       message: error instanceof Error ? error.message : "Unknown error",
+      isMockData: true,
     })
   }
 }
@@ -175,6 +240,41 @@ export async function GET(req: NextRequest) {
 // Create or process a document
 export async function POST(req: NextRequest) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      // For multipart/form-data requests, we can't easily mock the response
+      // So we'll just check the content type and return a mock response
+      const contentType = req.headers.get("content-type") || ""
+      if (contentType.includes("multipart/form-data")) {
+        return NextResponse.json({
+          document: {
+            id: "mock-doc-" + Date.now(),
+            title: "Uploaded Document",
+            status: "processed",
+            created_at: new Date().toISOString(),
+          },
+          status: "success",
+          isMockData: true,
+        })
+      }
+
+      // For JSON requests, we can parse the body and return a mock response
+      const body = await req.json()
+      return NextResponse.json(
+        {
+          document: {
+            id: "mock-doc-" + Date.now(),
+            ...body,
+            status: "pending",
+            created_at: new Date().toISOString(),
+          },
+          status: "success",
+          isMockData: true,
+        },
+        { status: 201 },
+      )
+    }
+
     // Check if this is a document processing request
     const contentType = req.headers.get("content-type") || ""
     if (contentType.includes("multipart/form-data")) {
@@ -254,6 +354,20 @@ export async function PUT(req: NextRequest) {
       )
     }
 
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      const body = await req.json()
+      return NextResponse.json({
+        document: {
+          id,
+          ...body,
+          updated_at: new Date().toISOString(),
+        },
+        status: "success",
+        isMockData: true,
+      })
+    }
+
     const body = await req.json()
     const { data, error } = await updateDocument(id, body)
 
@@ -302,6 +416,15 @@ export async function DELETE(req: NextRequest) {
         },
         { status: 400 },
       )
+    }
+
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      return NextResponse.json({
+        success: true,
+        status: "success",
+        isMockData: true,
+      })
     }
 
     const { error, success } = await deleteDocument(id)

@@ -14,6 +14,7 @@ import { SettingsForm } from "@/components/settings/settings-form"
 import { DocumentUploadFormWrapper } from "@/components/upload/document-upload-form-wrapper"
 import { ProtectedPageWrapper } from "@/components/protected-page-wrapper"
 import { EnvVarChecker } from "@/components/dashboard/env-var-checker"
+import { shouldUseMockData } from "@/lib/environment"
 
 // Disable static generation for this page
 export const dynamic = "force-dynamic"
@@ -25,7 +26,7 @@ export default function DashboardPage() {
       <div className="container mx-auto p-4 space-y-6">
         <h1 className="text-3xl font-bold">UE-RAG Dashboard</h1>
 
-        <EnvVarChecker />
+        {shouldUseMockData() && <EnvVarChecker />}
 
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="grid grid-cols-6 mb-8">

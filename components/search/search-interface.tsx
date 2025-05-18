@@ -8,11 +8,12 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Search, Info } from "lucide-react"
+import { Loader2, Search, Info, AlertCircle } from "lucide-react"
 import SearchResults from "./search-results"
 import { useToast } from "@/components/ui/use-toast"
 import { apiClient } from "@/lib/api-client"
 import { logError } from "@/lib/error-handler"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 // Define the search result type
 export interface SearchResult {
@@ -36,6 +37,7 @@ function SearchInterface() {
   const [loading, setLoading] = useState(false)
   const [searchType, setSearchType] = useState("hybrid")
   const [error, setError] = useState<string | null>(null)
+  const [isMockData, setIsMockData] = useState(false)
   const { toast } = useToast()
 
   const handleSearch = async () => {
@@ -44,6 +46,7 @@ function SearchInterface() {
     // Set loading state before starting the search
     setLoading(true)
     setError(null)
+    setIsMockData(false)
 
     try {
       // Track the search for analytics (non-blocking)
@@ -59,6 +62,11 @@ function SearchInterface() {
       }
 
       const data = await response.json()
+
+      // Check if the response contains mock data
+      if (data.isMockData) {
+        setIsMockData(true)
+      }
 
       // Update results state after search completes
       setResults(data.results || [])
@@ -160,6 +168,16 @@ function SearchInterface() {
               </p>
             </TabsContent>
           </Tabs>
+
+          {isMockData && (
+            <Alert variant="warning">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Preview Mode</AlertTitle>
+              <AlertDescription>
+                You are viewing mock search results. Connect to a database in production for real results.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {error && (
             <div className="bg-destructive/10 text-destructive p-3 rounded-md flex items-start">

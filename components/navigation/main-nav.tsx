@@ -1,67 +1,68 @@
 "use client"
-
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { FileText, Home, Settings, Upload, Search, BarChart } from "lucide-react"
+import { shouldUseMockData } from "@/lib/environment"
+import { AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export function MainNav() {
   const pathname = usePathname()
+  const isMockData = shouldUseMockData()
 
-  const routes = [
+  const navItems = [
     {
+      name: "Dashboard",
       href: "/",
-      label: "Home",
-      icon: Home,
-      active: pathname === "/",
     },
     {
+      name: "Documents",
       href: "/documents",
-      label: "Documents",
-      icon: FileText,
-      active: pathname === "/documents",
     },
     {
-      href: "/upload",
-      label: "Upload",
-      icon: Upload,
-      active: pathname === "/upload",
-    },
-    {
+      name: "Search",
       href: "/search",
-      label: "Search",
-      icon: Search,
-      active: pathname === "/search",
     },
     {
+      name: "Upload",
+      href: "/upload",
+    },
+    {
+      name: "Analytics",
       href: "/analytics",
-      label: "Analytics",
-      icon: BarChart,
-      active: pathname === "/analytics",
     },
     {
+      name: "Feedback",
+      href: "/feedback",
+    },
+    {
+      name: "Settings",
       href: "/settings",
-      label: "Settings",
-      icon: Settings,
-      active: pathname === "/settings",
     },
   ]
 
   return (
-    <nav className="flex items-center space-x-4 lg:space-x-6 mx-6">
-      {routes.map((route) => (
-        <Link
-          key={route.href}
-          href={route.href}
-          className={cn(
-            "flex items-center text-sm font-medium transition-colors hover:text-primary",
-            route.active ? "text-black dark:text-white" : "text-muted-foreground",
-          )}
-        >
-          <route.icon className="mr-2 h-4 w-4" />
-          <span className="hidden md:block">{route.label}</span>
-        </Link>
-      ))}
-    </nav>
+    <div className="flex flex-col">
+      {isMockData && (
+        <Alert variant="warning" className="mb-2 py-1 px-2">
+          <AlertCircle className="h-3 w-3" />
+          <AlertDescription className="text-xs">Preview Mode</AlertDescription>
+        </Alert>
+      )}
+      <nav className="flex items-center space-x-4 lg:space-x-6">
+        {navItems.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "text-sm font-medium transition-colors hover:text-primary",
+              pathname === item.href ? "text-primary" : "text-muted-foreground",
+            )}
+          >
+            {item.name}
+          </Link>
+        ))}
+      </nav>
+    </div>
   )
 }

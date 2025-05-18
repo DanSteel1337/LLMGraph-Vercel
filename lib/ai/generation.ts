@@ -1,3 +1,6 @@
+import { shouldUseMockData } from "@/lib/environment"
+import { getMockGeneratedAnswer, getMockDocumentSummary } from "@/lib/mock-data"
+
 /**
  * Generate answer from search results
  * @param query User query
@@ -6,6 +9,12 @@
  */
 export async function generateAnswerFromResults(query: string, results: any[]) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      console.log("[MOCK] Using mock generated answer")
+      return getMockGeneratedAnswer(query, results)
+    }
+
     // Prepare context from results
     const context = results
       .map((result, index) => `Document ${index + 1} (${result.title}): ${result.content}`)
@@ -49,6 +58,12 @@ export async function generateAnswerFromResults(query: string, results: any[]) {
  */
 export async function generateDocumentSummary(title: string, content: string) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      console.log("[MOCK] Using mock document summary")
+      return getMockDocumentSummary(title)
+    }
+
     // Truncate content if too long
     const truncatedContent = content.length > 8000 ? content.substring(0, 8000) + "..." : content
 

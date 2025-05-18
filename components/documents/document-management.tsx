@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { ArrowUpDown, ChevronDown, MoreHorizontal, Pencil, Trash2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -30,18 +30,11 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
-import { supabase } from "@/lib/supabase/client"
 import { DocumentEditDialog } from "./document-edit-dialog"
-
-export type Document = {
-  id: string
-  title: string
-  category: string
-  version: string
-  uploadedAt: string
-  status: "processed" | "processing" | "failed"
-  size: number
-}
+import { shouldUseMockData } from "@/lib/environment"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import apiClient from "@/lib/api-client"
+import type { Document } from "@/types/documents"
 
 // Mock data for development when USE_MOCK_DATA is true
 const MOCK_DOCUMENTS = [
@@ -101,6 +94,7 @@ export function DocumentManagement() {
   const [isLoading, setIsLoading] = useState(true)
   const [editingDocument, setEditingDocument] = useState<Document | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [isMockData, setIsMockData] = useState(false)
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -108,35 +102,26 @@ export function DocumentManagement() {
         setIsLoading(true)
         setError(null)
 
-        // Use mock data if environment variable is set
-        if (process.env.USE_MOCK_DATA === "true") {
+        // Use mock data if in preview environment
+        if (shouldUseMockData()) {
           setDocuments(MOCK_DOCUMENTS)
+          setIsMockData(true)
           return
         }
 
-        const { data, error } = await supabase.from("documents").select("*").order("created_at", { ascending: false })
+        // Use the API client instead of direct Supabase calls
+        const response = await apiClient.documents.getAll()
 
-        if (error) {
-          throw error
+        if (!response.success) {
+          throw new Error(response.error || "Failed to fetch documents")
         }
 
-        if (!data) {
+        if (!response.data) {
           setDocuments([])
           return
         }
 
-        // Transform the data to match the Document type
-        const formattedDocuments: Document[] = data.map((doc) => ({
-          id: doc.id,
-          title: doc.title,
-          category: doc.category || "Uncategorized",
-          version: doc.metadata?.version || "Unknown",
-          uploadedAt: doc.created_at,
-          status: doc.status || "processed",
-          size: doc.metadata?.size || 0,
-        }))
-
-        setDocuments(formattedDocuments)
+        setDocuments(response.data)
       } catch (error) {
         console.error("Failed to fetch documents:", error)
         setError("Failed to load documents. Please try again.")
@@ -155,8 +140,8 @@ export function DocumentManagement() {
 
   const handleDeleteDocument = async (id: string) => {
     try {
-      // Use mock data if environment variable is set
-      if (process.env.USE_MOCK_DATA === "true") {
+      // Use mock data if in preview environment
+      if (shouldUseMockData()) {
         // Just remove from local state for mock data
         setDocuments(documents.filter((doc) => doc.id !== id))
         toast({
@@ -166,10 +151,11 @@ export function DocumentManagement() {
         return
       }
 
-      const { error } = await supabase.from("documents").delete().eq("id", id)
+      // Use the API client instead of direct Supabase calls
+      const response = await apiClient.documents.delete(id)
 
-      if (error) {
-        throw error
+      if (!response.success) {
+        throw new Error(response.error || "Failed to delete document")
       }
 
       setDocuments(documents.filter((doc) => doc.id !== id))
@@ -343,6 +329,16 @@ export function DocumentManagement() {
 
   return (
     <div className="space-y-4">
+      {isMockData && (
+        <Alert variant="warning" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Preview Mode</AlertTitle>
+          <AlertDescription>
+            You are viewing mock document data. Connect to a database in production for real data.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex items-center justify-between">
         <Input
           placeholder="Filter documents..."

@@ -5,7 +5,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
-import { Loader2, FileText, Database, Code } from "lucide-react"
+import { Loader2, FileText, Database, Code, AlertCircle } from "lucide-react"
+import { shouldUseMockData } from "@/lib/environment"
+import { apiClient } from "@/lib/api-client"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 interface DocumentPreviewModalProps {
   documentId: string
@@ -35,6 +38,69 @@ interface VectorData {
   score?: number
 }
 
+// Mock data for development
+const MOCK_DOCUMENT: DocumentData = {
+  id: "mock-doc-1",
+  title: "Getting Started with Unreal Engine",
+  content:
+    "This is a sample document content for the Unreal Engine documentation.\n\nUnreal Engine is a complete suite of creation tools designed to meet ambitious artistic visions while being flexible enough to ensure success for teams of all sizes.\n\nAs a proven, comprehensive toolset that has delivered hundreds of games, Unreal Engine provides a solid foundation for your team to build upon.",
+  metadata: {
+    version: "5.4",
+    category: "Beginner",
+    author: "Epic Games",
+    tags: ["getting-started", "basics", "introduction"],
+  },
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+}
+
+const MOCK_CHUNKS: ChunkData[] = [
+  {
+    id: "chunk-1",
+    content: "This is a sample document content for the Unreal Engine documentation.",
+    metadata: { index: 0, documentId: "mock-doc-1" },
+  },
+  {
+    id: "chunk-2",
+    content:
+      "Unreal Engine is a complete suite of creation tools designed to meet ambitious artistic visions while being flexible enough to ensure success for teams of all sizes.",
+    metadata: { index: 1, documentId: "mock-doc-1" },
+  },
+  {
+    id: "chunk-3",
+    content:
+      "As a proven, comprehensive toolset that has delivered hundreds of games, Unreal Engine provides a solid foundation for your team to build upon.",
+    metadata: { index: 2, documentId: "mock-doc-1" },
+  },
+]
+
+const MOCK_VECTORS: VectorData[] = [
+  {
+    id: "vector-1",
+    metadata: { chunkId: "chunk-1", documentId: "mock-doc-1" },
+    values: Array(10)
+      .fill(0)
+      .map(() => Math.random() * 2 - 1),
+    score: 0.95,
+  },
+  {
+    id: "vector-2",
+    metadata: { chunkId: "chunk-2", documentId: "mock-doc-1" },
+    values: Array(10)
+      .fill(0)
+      .map(() => Math.random() * 2 - 1),
+    score: 0.87,
+  },
+  {
+    id: "vector-3",
+    metadata: { chunkId: "chunk-3", documentId: "mock-doc-1" },
+    values: Array(10)
+      .fill(0)
+      .map(() => Math.random() * 2 - 1),
+    score: 0.82,
+  },
+]
+
 export function DocumentPreviewModal({ documentId, isOpen, onClose }: DocumentPreviewModalProps) {
   const [document, setDocument] = useState<DocumentData | null>(null)
   const [chunks, setChunks] = useState<ChunkData[]>([])
@@ -45,6 +111,7 @@ export function DocumentPreviewModal({ documentId, isOpen, onClose }: DocumentPr
     vectors: false,
   })
   const [activeTab, setActiveTab] = useState("document")
+  const [isMockData, setIsMockData] = useState(false)
 
   useEffect(() => {
     if (isOpen && documentId) {
@@ -55,10 +122,20 @@ export function DocumentPreviewModal({ documentId, isOpen, onClose }: DocumentPr
   const fetchDocument = async () => {
     setLoading((prev) => ({ ...prev, document: true }))
     try {
-      const response = await fetch(`/api/documents/${documentId}`)
+      // Check if we should use mock data
+      if (shouldUseMockData()) {
+        setDocument(MOCK_DOCUMENT)
+        setIsMockData(true)
+        setLoading((prev) => ({ ...prev, document: false }))
+        return
+      }
+
+      const response = await apiClient.get(`/documents/${documentId}`)
       if (!response.ok) throw new Error("Failed to fetch document")
+
       const data = await response.json()
       setDocument(data)
+      setIsMockData(data.isMockData || false)
     } catch (error) {
       console.error("Error fetching document:", error)
     } finally {
@@ -70,8 +147,16 @@ export function DocumentPreviewModal({ documentId, isOpen, onClose }: DocumentPr
     if (chunks.length > 0) return
     setLoading((prev) => ({ ...prev, chunks: true }))
     try {
-      const response = await fetch(`/api/documents/${documentId}/chunks`)
+      // Check if we should use mock data
+      if (shouldUseMockData() || isMockData) {
+        setChunks(MOCK_CHUNKS)
+        setLoading((prev) => ({ ...prev, chunks: false }))
+        return
+      }
+
+      const response = await apiClient.get(`/documents/${documentId}/chunks`)
       if (!response.ok) throw new Error("Failed to fetch chunks")
+
       const data = await response.json()
       setChunks(data)
     } catch (error) {
@@ -85,8 +170,16 @@ export function DocumentPreviewModal({ documentId, isOpen, onClose }: DocumentPr
     if (vectors.length > 0) return
     setLoading((prev) => ({ ...prev, vectors: true }))
     try {
-      const response = await fetch(`/api/documents/${documentId}/vectors`)
+      // Check if we should use mock data
+      if (shouldUseMockData() || isMockData) {
+        setVectors(MOCK_VECTORS)
+        setLoading((prev) => ({ ...prev, vectors: false }))
+        return
+      }
+
+      const response = await apiClient.get(`/documents/${documentId}/vectors`)
       if (!response.ok) throw new Error("Failed to fetch vectors")
+
       const data = await response.json()
       setVectors(data)
     } catch (error) {
@@ -112,6 +205,16 @@ export function DocumentPreviewModal({ documentId, isOpen, onClose }: DocumentPr
             {document?.createdAt && ` • Created: ${new Date(document.createdAt).toLocaleString()}`}
           </DialogDescription>
         </DialogHeader>
+
+        {isMockData && (
+          <Alert variant="warning" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Preview Mode</AlertTitle>
+            <AlertDescription>
+              You are viewing mock document data. Connect to a database in production for real data.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 overflow-hidden flex flex-col">
           <TabsList>

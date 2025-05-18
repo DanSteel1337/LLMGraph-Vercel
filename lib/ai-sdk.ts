@@ -67,9 +67,6 @@ export async function processDocument(id: string, title: string, content: string
 
 export { insertDocumentIntoPinecone, deleteDocumentFromPinecone }
 
-// Mock data flag for testing
-export const USE_MOCK_DATA = validateEnvVar("USE_MOCK_DATA", false) === "true"
-
 // Centralized AI functionality
 async function generateResponse(prompt: string, context: string) {
   // Validate OpenAI API key

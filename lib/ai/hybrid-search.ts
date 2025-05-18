@@ -3,6 +3,8 @@ import { getPineconeIndex } from "@/lib/pinecone/client"
 import { buildPineconeFilters } from "@/lib/pinecone/filters"
 import { logError } from "@/lib/error-handler"
 import { validateEnvVar } from "@/lib/env-validator"
+import { shouldUseMockData } from "@/lib/environment"
+import { getMockSearchResults } from "@/lib/mock-data"
 
 // Validate required environment variables
 validateEnvVar("PINECONE_API_KEY")
@@ -97,81 +99,74 @@ export function highlightText(text: string, query: string): string {
 }
 
 /**
- * Rerank search results using keyword matching
- * @param matches Vector search matches
- * @param keywords Keywords from the query
- * @param originalQuery Original search query
- * @returns Reranked search results
+ * Rerank search results based on relevance to query
+ * @param query Search query
+ * @param results Search results
+ * @returns Reranked results
  */
-function rerank(matches: any[], keywords: string[], originalQuery: string): any[] {
-  return matches
-    .map((match) => {
-      const text = match.metadata?.text || ""
-      const title = match.metadata?.title || ""
+export function rerank(query: string, results: any[]) {
+  // Check if we should use mock data
+  if (shouldUseMockData()) {
+    console.log("[MOCK] Using mock reranking")
+    // Just return the results as is for mock data
+    return results
+  }
 
-      // Count keyword occurrences
-      let keywordMatches = 0
-      keywords.forEach((keyword) => {
-        const regex = new RegExp(keyword, "gi")
-        const textMatches = (text.match(regex) || []).length
-        const titleMatches = (title.match(regex) || []).length
-        keywordMatches += textMatches + titleMatches * 2 // Title matches count double
-      })
+  // Implement reranking logic here
+  // This would typically involve:
+  // 1. Calculate relevance scores
+  // 2. Sort by relevance
 
-      // Exact phrase match bonus
-      const exactMatch = text.toLowerCase().includes(originalQuery.toLowerCase())
-      const exactMatchBonus = exactMatch ? 0.2 : 0
-
-      // Combine vector similarity with keyword matching
-      const vectorScore = match.score || 0
-      const keywordScore = keywordMatches * 0.05 // Each keyword match adds 0.05
-      const combinedScore = vectorScore * 0.7 + keywordScore + exactMatchBonus
-
-      return {
-        ...match,
-        score: combinedScore,
-        matchType: keywordMatches > 0 ? "hybrid" : "vector",
-      }
-    })
-    .sort((a, b) => b.score - a.score)
+  // For now, we'll just return the results as is
+  return results
 }
 
 /**
- * Perform hybrid search combining vector similarity and keyword matching
+ * Perform hybrid search using both vector and keyword search
  * @param query Search query
  * @param filters Optional filters
- * @param limit Maximum number of results to return
+ * @param options Search options
  * @returns Search results
  */
-export async function hybridSearch(query: string, filters?: Record<string, any>, limit = 10): Promise<SearchResult[]> {
+export async function performHybridSearch(
+  query: string,
+  filters: Record<string, any> = {},
+  options: {
+    limit?: number
+    vectorWeight?: number
+    keywordWeight?: number
+  } = {},
+) {
   try {
-    console.log(`Performing hybrid search for: "${query}"`)
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      console.log("[MOCK] Using mock search results for hybrid search")
+      return {
+        results: getMockSearchResults(query, filters),
+        isMockData: true,
+      }
+    }
 
-    // Vector search
-    const vectorResults = await searchWithEmbeddings(query, filters, limit * 2)
+    // Set default options
+    const limit = options.limit || 10
+    const vectorWeight = options.vectorWeight || 0.7
+    const keywordWeight = options.keywordWeight || 0.3
 
-    // Extract keywords for text matching
-    const keywords = extractKeywords(query)
+    // Implement actual hybrid search logic here
+    // This would typically involve:
+    // 1. Generate embeddings for the query
+    // 2. Perform vector search
+    // 3. Perform keyword search
+    // 4. Combine and rerank results
 
-    // Rerank results using keyword matching
-    const rerankedResults = rerank(vectorResults, keywords, query)
-
-    // Return top K results after reranking
-    return rerankedResults.slice(0, limit).map((match) => ({
-      id: match.id,
-      score: match.score,
-      title: match.metadata?.title || "Untitled Document",
-      content: match.metadata?.text || "",
-      category: match.metadata?.category || "Uncategorized",
-      version: match.metadata?.version || "Unknown",
-      documentId: match.metadata?.documentId || match.id,
-      highlights: [highlightText(match.metadata?.text as string, query)],
-      matchType: match.matchType,
-    }))
+    // For now, we'll just return a placeholder
+    return {
+      results: [],
+      message: "Hybrid search not implemented yet",
+    }
   } catch (error) {
-    logError(error, "hybrid_search_failure")
-    console.error("Error performing hybrid search:", error)
-    return []
+    logError(error, "hybrid_search_error")
+    throw new Error(`Hybrid search failed: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
 
@@ -262,7 +257,7 @@ export async function trackSearchQuery(query: string, resultCount: number, userI
 }
 
 // Add the missing export to fix deployment error
-export const searchDocuments = hybridSearch
+export const searchDocuments = performHybridSearch
 
 /**
  * Performs a search using embeddings

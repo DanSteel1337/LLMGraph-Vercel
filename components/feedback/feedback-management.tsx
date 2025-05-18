@@ -28,6 +28,7 @@ export function FeedbackManagement() {
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null)
   const [tableExists, setTableExists] = useState(true)
   const [createTableMessage, setCreateTableMessage] = useState<string | null>(null)
+  const [isMockData, setIsMockData] = useState(false)
 
   useEffect(() => {
     const fetchFeedback = async () => {
@@ -35,6 +36,11 @@ export function FeedbackManagement() {
         setLoading(true)
         const response = await apiClient.get("/api/feedback")
         const data = await response.data
+
+        // Check if the response contains mock data
+        if (data.isMockData) {
+          setIsMockData(true)
+        }
 
         if (data.message && data.message.includes("does not exist")) {
           setTableExists(false)
@@ -171,6 +177,16 @@ export function FeedbackManagement() {
         <CardDescription>Manage user feedback on search results</CardDescription>
       </CardHeader>
       <CardContent>
+        {isMockData && (
+          <Alert variant="warning" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Preview Mode</AlertTitle>
+            <AlertDescription>
+              You are viewing mock feedback data. Connect to a database in production for real feedback.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {feedback.length === 0 ? (
           <div className="text-center py-8 text-gray-500">No feedback submissions yet</div>
         ) : (

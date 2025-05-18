@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
+import { useForm } from "react"
 import { z } from "zod"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -19,8 +19,9 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/use-toast"
-import { updateDocument } from "@/lib/api"
-import type { Document } from "./document-management"
+import { apiClient } from "@/lib/api-client"
+import { shouldUseMockData } from "@/lib/environment"
+import type { DocumentEditDialogProps } from "@/types/documents"
 
 const formSchema = z.object({
   title: z.string().min(2, {
@@ -55,13 +56,6 @@ const versions = [
   { value: "4.27", label: "UE 4.27" },
 ]
 
-interface DocumentEditDialogProps {
-  document: Document
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onSave: (document: Document) => void
-}
-
 export function DocumentEditDialog({ document, open, onOpenChange, onSave }: DocumentEditDialogProps) {
   const [isSaving, setIsSaving] = useState(false)
 
@@ -80,7 +74,34 @@ export function DocumentEditDialog({ document, open, onOpenChange, onSave }: Doc
     setIsSaving(true)
 
     try {
-      const updatedDoc = await updateDocument(document.id, values)
+      // Handle mock data mode
+      if (shouldUseMockData()) {
+        // Simulate a delay
+        await new Promise((resolve) => setTimeout(resolve, 500))
+
+        // Return mock updated document
+        const updatedDoc = {
+          ...document,
+          ...values,
+        }
+
+        toast({
+          title: "Document updated",
+          description: "Your document has been updated successfully.",
+        })
+
+        onSave(updatedDoc)
+        return
+      }
+
+      // Real API call
+      const response = await apiClient.put(`/documents/${document.id}`, values)
+
+      if (!response.ok) {
+        throw new Error("Failed to update document")
+      }
+
+      const updatedDoc = await response.json()
 
       toast({
         title: "Document updated",

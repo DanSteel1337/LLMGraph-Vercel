@@ -1,7 +1,13 @@
 /**
- * Environment variable validator
- * Centralizes all environment variable access and validation
+ * Environment Variable Validator Module
+ *
+ * Provides utilities for validating and accessing environment variables with
+ * caching and error handling. Centralizes all environment variable access.
+ *
+ * @module env-validator
  */
+
+import { shouldUseMockData, isDevelopment, isPreviewDeployment, isProduction } from "./environment"
 
 // Cache validated environment variables
 const validatedEnvVars: Record<string, string> = {}
@@ -14,6 +20,11 @@ const validatedEnvVars: Record<string, string> = {}
  * @returns The environment variable value
  */
 export function validateEnvVar(name: string, required = true, defaultValue = ""): string {
+  // Special case for USE_MOCK_DATA - use the environment utility instead
+  if (name === "USE_MOCK_DATA") {
+    return shouldUseMockData() ? "true" : "false"
+  }
+
   // Return cached value if already validated
   if (validatedEnvVars[name]) {
     return validatedEnvVars[name]
@@ -51,4 +62,15 @@ export function validateClientEnvVar(name: string, required = true, defaultValue
  */
 export function getValidatedEnvVars(): Record<string, string> {
   return { ...validatedEnvVars }
+}
+
+/**
+ * Gets the current environment name
+ * @returns The current environment name (development, preview, production)
+ */
+export function getEnvironmentName(): string {
+  if (isDevelopment()) return "development"
+  if (isPreviewDeployment()) return "preview"
+  if (isProduction()) return "production"
+  return "unknown"
 }

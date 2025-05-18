@@ -1,16 +1,21 @@
 "use client"
 
 import { useState } from "react"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
+
 import { Loader2 } from "lucide-react"
+
+import { apiClient } from "@/lib/api-client"
+import { shouldUseMockData, isProduction } from "@/lib/environment"
 
 export function SettingsForm() {
   const [loading, setLoading] = useState(false)
@@ -22,7 +27,8 @@ export function SettingsForm() {
     siteName: "Vector RAG Dashboard",
     siteDescription: "A dashboard for managing vector-based RAG systems",
     apiUrl: typeof window !== "undefined" ? `${window.location.origin}/api` : "/api",
-    useMockData: process.env.USE_MOCK_DATA === "true",
+    useMockData: shouldUseMockData(),
+    isProduction: isProduction(),
   })
 
   const [embeddingSettings, setEmbeddingSettings] = useState({
@@ -33,7 +39,7 @@ export function SettingsForm() {
   })
 
   const [pineconeSettings, setPineconeSettings] = useState({
-    indexName: process.env.PINECONE_INDEX_NAME || "",
+    indexName: "unreal-docs", // Default value instead of environment variable
     namespace: "default",
     metric: "cosine",
   })
@@ -67,8 +73,15 @@ export function SettingsForm() {
         return
       }
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // Use apiClient to save settings
+      const response = await apiClient.post("/api/settings", {
+        type: "general",
+        settings: generalSettings,
+      })
+
+      if (response.error) {
+        throw new Error(response.error)
+      }
 
       toast({
         title: "Settings saved",
@@ -89,8 +102,15 @@ export function SettingsForm() {
   const handleSaveEmbedding = async () => {
     setLoading(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // Use apiClient to save settings
+      const response = await apiClient.post("/api/settings", {
+        type: "embedding",
+        settings: embeddingSettings,
+      })
+
+      if (response.error) {
+        throw new Error(response.error)
+      }
 
       toast({
         title: "Settings saved",
@@ -111,8 +131,15 @@ export function SettingsForm() {
   const handleSavePinecone = async () => {
     setLoading(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // Use apiClient to save settings
+      const response = await apiClient.post("/api/settings", {
+        type: "pinecone",
+        settings: pineconeSettings,
+      })
+
+      if (response.error) {
+        throw new Error(response.error)
+      }
 
       toast({
         title: "Settings saved",
@@ -176,7 +203,7 @@ export function SettingsForm() {
                   placeholder="/api"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Default is "/api" or the current origin + "/api". No environment variable needed.
+                  Default is {"/api"} or the current origin + {"/api"}. No environment variable needed.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -184,8 +211,19 @@ export function SettingsForm() {
                   id="useMockData"
                   checked={generalSettings.useMockData}
                   onCheckedChange={(checked) => setGeneralSettings({ ...generalSettings, useMockData: checked })}
+                  disabled={!generalSettings.isProduction} // Only allow toggling in production
                 />
                 <Label htmlFor="useMockData">Use Mock Data</Label>
+                {!generalSettings.isProduction && (
+                  <span className="text-xs text-amber-600 ml-2">(Always enabled in preview environments)</span>
+                )}
+              </div>
+              <div className="mt-2 p-2 bg-muted rounded-md">
+                <p className="text-xs text-muted-foreground">
+                  <strong>Environment:</strong> {generalSettings.isProduction ? "Production" : "Preview/Development"}
+                  <br />
+                  {!generalSettings.isProduction && "Mock data is automatically enabled in preview environments."}
+                </p>
               </div>
             </CardContent>
             <CardFooter>
