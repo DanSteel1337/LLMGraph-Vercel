@@ -1,21 +1,31 @@
 "use client"
 
+// Type imports
 import type React from "react"
 
+// React imports
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+// External library imports
+import { AlertCircle, Info, Loader2, Search } from "lucide-react"
+
+// Internal component imports
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Search, Info, AlertCircle } from "lucide-react"
-import SearchResults from "./search-results"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
+
+// Internal utility imports
 import { apiClient } from "@/lib/api-client"
 import { logError } from "@/lib/error-handler"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-// Define the search result type
+// Sibling imports
+import SearchResults from "./search-results"
+
+// Internal types - used by this component and exported for other components that need it
 export interface SearchResult {
   id: string
   title: string
@@ -202,7 +212,7 @@ function SearchInterface() {
 
           {!loading && query && results.length === 0 && !error && (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">No results found for "{query}"</p>
+              <p className="text-muted-foreground">No results found for &quot;{query}&quot;</p>
               <p className="text-sm text-muted-foreground mt-2">Try using different keywords or search terms</p>
             </div>
           )}
@@ -222,6 +232,6 @@ function SearchInterface() {
   )
 }
 
-// Export both as default and named export to support both import styles
-export default SearchInterface
+// Export as both named and default export to maintain compatibility
 export { SearchInterface }
+export default SearchInterface
