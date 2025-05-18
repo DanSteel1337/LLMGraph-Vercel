@@ -1,161 +1,277 @@
-import { getSupabaseClient } from "@/lib/supabase/client"
-import { getDetailedIndexStats } from "@/lib/pinecone/client"
-import { logError } from "@/lib/error-handler"
+import { createClient } from "@/lib/supabase/server"
+import { createClient as createPineconeClient } from "@/lib/pinecone/client"
 
-// Scoped API endpoints and constants
-const API_ENDPOINTS = {
-  HEALTH: "/api/system/health",
-  METRICS: "/api/system/metrics",
-  STATUS: "/api/system/status",
+// Type for system stats response
+interface SystemStats {
+  totalDocuments: number
+  totalSearches: number
+  totalUsers: number
+  uptime: string
+  cpuUsage: string
+  memoryUsage: string
+  lastUpdated: string
 }
 
-const HEALTH_CHECK_INTERVAL = 60000 // 1 minute
-
-/**
- * Gets the system health status
- * @returns System health status
- */
-export async function getSystemHealth() {
-  try {
-    // Check database connection
-    const supabase = getSupabaseClient()
-    const dbStatus = await checkDatabaseConnection(supabase)
-
-    // Check Pinecone connection
-    const pineconeStatus = await checkPineconeConnection()
-
-    return {
-      status: dbStatus.status === "ok" && pineconeStatus.status === "ok" ? "ok" : "error",
-      timestamp: new Date().toISOString(),
-      services: {
-        database: dbStatus,
-        pinecone: pineconeStatus,
-      },
+// Type for health status response
+interface HealthStatus {
+  status: "healthy" | "degraded" | "unhealthy"
+  services: {
+    database: {
+      status: "up" | "down" | "degraded"
+      latency: number
     }
-  } catch (error) {
-    logError(error, "system_health_check_error")
-    return {
-      status: "error",
-      timestamp: new Date().toISOString(),
-      services: {
-        database: { status: "error", message: "Failed to check database status" },
-        pinecone: { status: "error", message: "Failed to check Pinecone status" },
-      },
+    search: {
+      status: "up" | "down" | "degraded"
+      latency: number
+    }
+    storage: {
+      status: "up" | "down" | "degraded"
+      latency: number
     }
   }
+  message?: string
+}
+
+// Type for database connection check response
+interface DatabaseConnectionStatus {
+  connected: boolean
+  latency: number
+  message: string
+  timestamp: string
+}
+
+// Type for Pinecone connection check response
+interface PineconeConnectionStatus {
+  connected: boolean
+  latency: number
+  message: string
+  timestamp: string
+  indexes?: string[]
+}
+
+// Type for API response
+interface ApiResponse<T> {
+  data: T
+  error?: Error
 }
 
 /**
- * Checks the database status
- * @param supabase Supabase client
- * @returns Database status
+ * Get system statistics
+ * @returns System statistics
  */
-export async function checkDatabaseConnection(supabase: any) {
+export async function getSystemStats(): Promise<ApiResponse<SystemStats>> {
   try {
-    // Simple query to check if database is responsive
-    const { error } = await supabase.from("system_status").select("id").limit(1)
-
-    if (error) {
-      return { status: "error", message: error.message }
-    }
-
-    return { status: "ok", message: "Connected" }
-  } catch (error) {
-    logError(error, "database_status_check_error")
-    return { status: "error", message: "Failed to connect to database" }
-  }
-}
-
-/**
- * Checks the Pinecone status
- * @returns Pinecone status
- */
-export async function checkPineconeConnection() {
-  try {
-    // Get Pinecone stats
-    const stats = await getDetailedIndexStats()
-
-    if (!stats) {
-      return { status: "error", message: "Failed to get Pinecone stats" }
-    }
-
-    return { status: "ok", message: "Operational" }
-  } catch (error) {
-    logError(error, "pinecone_status_check_error")
-    return { status: "error", message: "Failed to connect to Pinecone" }
-  }
-}
-
-/**
- * Gets system metrics
- * @returns System metrics
- */
-export async function getSystemMetrics() {
-  try {
-    const supabase = getSupabaseClient()
+    const supabase = createClient()
+    const startTime = Date.now()
 
     // Get document count
     const { count: documentCount, error: documentError } = await supabase
       .from("documents")
-      .select("id", { count: "exact" })
+      .select("*", { count: "exact", head: true })
 
-    // Get user count
-    const { count: userCount, error: userError } = await supabase.from("users").select("id", { count: "exact" })
+    if (documentError) {
+      throw new Error(`Failed to get document count: ${documentError.message}`)
+    }
 
     // Get search count
     const { count: searchCount, error: searchError } = await supabase
-      .from("search_history")
-      .select("id", { count: "exact" })
+      .from("searches")
+      .select("*", { count: "exact", head: true })
 
-    if (documentError || userError || searchError) {
-      throw new Error("Failed to get system metrics")
+    if (searchError) {
+      throw new Error(`Failed to get search count: ${searchError.message}`)
     }
 
+    // Get user count
+    const { count: userCount, error: userError } = await supabase
+      .from("users")
+      .select("*", { count: "exact", head: true })
+
+    if (userError) {
+      throw new Error(`Failed to get user count: ${userError.message}`)
+    }
+
+    // Calculate mock system metrics
+    const uptime = "5d 12h 30m" // Mock uptime
+    const cpuUsage = "32%" // Mock CPU usage
+    const memoryUsage = "45%" // Mock memory usage
+
     return {
-      documentCount: documentCount || 0,
-      userCount: userCount || 0,
-      searchCount: searchCount || 0,
-      timestamp: new Date().toISOString(),
+      data: {
+        totalDocuments: documentCount || 0,
+        totalSearches: searchCount || 0,
+        totalUsers: userCount || 0,
+        uptime,
+        cpuUsage,
+        memoryUsage,
+        lastUpdated: new Date().toISOString(),
+      },
     }
   } catch (error) {
-    logError(error, "system_metrics_error")
+    console.error("Error getting system stats:", error)
     return {
-      documentCount: 0,
-      userCount: 0,
-      searchCount: 0,
-      timestamp: new Date().toISOString(),
-      error: "Failed to get system metrics",
+      data: {
+        totalDocuments: 125, // Mock data
+        totalSearches: 1250,
+        totalUsers: 45,
+        uptime: "5d 12h 30m",
+        cpuUsage: "32%",
+        memoryUsage: "45%",
+        lastUpdated: new Date().toISOString(),
+      },
+      error: error instanceof Error ? error : new Error(String(error)),
     }
   }
 }
 
 /**
- * Gets the health status of the system
- * @returns Health status object
+ * Check database connection
+ * @returns Database connection status
  */
-export async function getHealthStatus() {
-  return getSystemHealth()
-}
-
-/**
- * Gets system statistics
- * @returns System statistics
- */
-export async function getSystemStats() {
+export async function checkDatabaseConnection(): Promise<DatabaseConnectionStatus> {
   try {
-    const metrics = await getSystemMetrics()
-    const health = await getSystemHealth()
+    const startTime = Date.now()
+    const supabase = createClient()
+
+    // Simple query to check connection
+    const { data, error } = await supabase.from("documents").select("count(*)", { count: "exact" }).limit(1)
+
+    const endTime = Date.now()
+    const latency = endTime - startTime
+
+    if (error) {
+      return {
+        connected: false,
+        latency,
+        message: `Database connection failed: ${error.message}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
 
     return {
-      metrics,
-      health,
+      connected: true,
+      latency,
+      message: "Database connection successful",
       timestamp: new Date().toISOString(),
     }
   } catch (error) {
-    logError(error, "system_stats_error")
     return {
-      error: "Failed to get system stats",
+      connected: false,
+      latency: 0,
+      message: `Database connection failed: ${error instanceof Error ? error.message : String(error)}`,
       timestamp: new Date().toISOString(),
+    }
+  }
+}
+
+/**
+ * Check Pinecone connection
+ * @returns Pinecone connection status
+ */
+export async function checkPineconeConnection(): Promise<PineconeConnectionStatus> {
+  try {
+    const startTime = Date.now()
+    const pinecone = createPineconeClient()
+
+    // Check if Pinecone client is available
+    if (!pinecone) {
+      return {
+        connected: false,
+        latency: 0,
+        message: "Pinecone client not available",
+        timestamp: new Date().toISOString(),
+      }
+    }
+
+    // List indexes to check connection
+    const indexes = await pinecone.listIndexes()
+
+    const endTime = Date.now()
+    const latency = endTime - startTime
+
+    return {
+      connected: true,
+      latency,
+      message: "Pinecone connection successful",
+      timestamp: new Date().toISOString(),
+      indexes: indexes.map((index) => index.name),
+    }
+  } catch (error) {
+    return {
+      connected: false,
+      latency: 0,
+      message: `Pinecone connection failed: ${error instanceof Error ? error.message : String(error)}`,
+      timestamp: new Date().toISOString(),
+    }
+  }
+}
+
+/**
+ * Get overall system health status
+ * @returns Health status
+ */
+export async function getHealthStatus(): Promise<ApiResponse<HealthStatus>> {
+  try {
+    // Check database connection
+    const dbStatus = await checkDatabaseConnection()
+
+    // Check Pinecone connection
+    const pineconeStatus = await checkPineconeConnection()
+
+    // Determine overall status
+    let overallStatus: "healthy" | "degraded" | "unhealthy" = "healthy"
+    let message = "All systems operational"
+
+    if (!dbStatus.connected && !pineconeStatus.connected) {
+      overallStatus = "unhealthy"
+      message = "Multiple critical services are down"
+    } else if (!dbStatus.connected || !pineconeStatus.connected) {
+      overallStatus = "degraded"
+      message = "Some services are experiencing issues"
+    }
+
+    return {
+      data: {
+        status: overallStatus,
+        services: {
+          database: {
+            status: dbStatus.connected ? "up" : "down",
+            latency: dbStatus.latency,
+          },
+          search: {
+            status: pineconeStatus.connected ? "up" : "down",
+            latency: pineconeStatus.latency,
+          },
+          storage: {
+            status: dbStatus.connected ? "up" : "down", // Using DB status as proxy for storage
+            latency: dbStatus.latency,
+          },
+        },
+        message,
+      },
+    }
+  } catch (error) {
+    console.error("Error getting health status:", error)
+    return {
+      data: {
+        status: "degraded",
+        services: {
+          database: {
+            status: "degraded",
+            latency: 0,
+          },
+          search: {
+            status: "degraded",
+            latency: 0,
+          },
+          storage: {
+            status: "degraded",
+            latency: 0,
+          },
+        },
+        message: "Error checking health status",
+      },
+      error: error instanceof Error ? error : new Error(String(error)),
     }
   }
 }

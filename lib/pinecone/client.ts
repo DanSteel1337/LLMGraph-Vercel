@@ -15,7 +15,7 @@ const DEV_FALLBACKS = {
  * Gets or creates a Pinecone client
  * @returns Pinecone client
  */
-export function getPineconeClient() {
+export function createClient() {
   if (pineconeClient) {
     return pineconeClient
   }
@@ -46,7 +46,7 @@ export function getPineconeClient() {
  * @returns Pinecone index
  */
 export function getPineconeIndex() {
-  const pinecone = getPineconeClient()
+  const pinecone = createClient()
   const isDev = process.env.NODE_ENV === "development"
 
   // Get index name with development fallback

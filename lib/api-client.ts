@@ -216,6 +216,7 @@ export const systemApi = {
   getStatus: () => apiFetch<any>("/system?type=health"),
   getHealth: () => apiFetch<any>("/system?type=health"),
   getAnalytics: () => apiFetch<any>("/system?type=stats"),
+  testDbConnection: () => apiFetch<any>("/test-db-connection"),
 }
 
 // Settings API
